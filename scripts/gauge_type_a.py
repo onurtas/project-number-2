@@ -79,7 +79,7 @@ full_dataset_id = f"{PROJECT_ID}.{AUX_DATASET}"
 try:
     client.get_dataset(full_dataset_id)
 except Exception:
-    ds = bq.Dataset(full_dataset_id)
+    ds = bigquery.Dataset(full_dataset_id)
     ds.location = REGION
     client.create_dataset(ds)
     print(f"Created dataset: {full_dataset_id}")
@@ -93,7 +93,7 @@ lookup_top = (
 )
 job = client.load_table_from_dataframe(
     lookup_top, LOOKUP_FQN,
-    job_config=bq.LoadJobConfig(write_disposition="WRITE_TRUNCATE"),
+    job_config=bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE"),
 )
 job.result()
 print(f"Uploaded lookup: {LOOKUP_FQN} ({len(lookup_top)} rows)")
