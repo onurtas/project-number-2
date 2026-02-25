@@ -2,7 +2,7 @@ name: "Every 30min — Anomaly Alerts (Type C)"
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '0 * * * *'  # every hour
   workflow_dispatch:
 
 jobs:
