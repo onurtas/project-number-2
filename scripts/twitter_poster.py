@@ -1,6 +1,6 @@
 """
 Twitter/X Poster — Upload PNG + post tweet
-Uses OAuth 1.0a (User Context) for tweeting with media
+Uses OAuth 1.0a (User Context) with HMAC-SHA1
 """
 import os
 import sys
@@ -11,7 +11,6 @@ import hashlib
 import base64
 import urllib.parse
 import uuid
-import struct
 import requests
 
 # --- Credentials from environment ---
@@ -21,20 +20,24 @@ ACCESS_TOKEN = os.environ.get("X_ACCESS_TOKEN", "")
 ACCESS_SECRET = os.environ.get("X_ACCESS_SECRET", "")
 
 
+def _percent_encode(s):
+    return urllib.parse.quote(str(s), safe="")
+
+
 def _oauth_signature(method, url, params, consumer_secret, token_secret):
-    """Generate OAuth 1.0a signature."""
+    """Generate OAuth 1.0a HMAC-SHA1 signature."""
     sorted_params = "&".join(
-        f"{urllib.parse.quote(k, safe='')}={urllib.parse.quote(v, safe='')}"
+        f"{_percent_encode(k)}={_percent_encode(v)}"
         for k, v in sorted(params.items())
     )
     base_string = "&".join([
         method.upper(),
-        urllib.parse.quote(url, safe=""),
-        urllib.parse.quote(sorted_params, safe=""),
+        _percent_encode(url),
+        _percent_encode(sorted_params),
     ])
-    signing_key = f"{urllib.parse.quote(consumer_secret, safe='')}&{urllib.parse.quote(token_secret, safe='')}"
+    signing_key = f"{_percent_encode(consumer_secret)}&{_percent_encode(token_secret)}"
     signature = base64.b64encode(
-        hmac.new(signing_key.encode(), base_string.encode(), hashlib.sha256).digest()
+        hmac.new(signing_key.encode(), base_string.encode(), hashlib.sha1).digest()
     ).decode()
     return signature
 
@@ -44,7 +47,7 @@ def _oauth_header(method, url, extra_params=None):
     oauth_params = {
         "oauth_consumer_key": API_KEY,
         "oauth_nonce": uuid.uuid4().hex,
-        "oauth_signature_method": "HMAC-SHA256",
+        "oauth_signature_method": "HMAC-SHA1",
         "oauth_timestamp": str(int(time.time())),
         "oauth_token": ACCESS_TOKEN,
         "oauth_version": "1.0",
@@ -57,28 +60,24 @@ def _oauth_header(method, url, extra_params=None):
     oauth_params["oauth_signature"] = signature
 
     auth_str = ", ".join(
-        f'{urllib.parse.quote(k, safe="")}="{urllib.parse.quote(v, safe="")}"'
+        f'{_percent_encode(k)}="{_percent_encode(v)}"'
         for k, v in sorted(oauth_params.items())
     )
     return f"OAuth {auth_str}"
 
 
 def upload_media(image_path):
-    """Upload image to Twitter and return media_id."""
+    """Upload image to Twitter using multipart form upload and return media_id."""
     url = "https://upload.twitter.com/1.1/media/upload.json"
 
     with open(image_path, "rb") as f:
-        image_data = f.read()
-
-    # For images under 5MB, use simple upload
-    b64_data = base64.b64encode(image_data).decode()
-    params = {
-        "media_data": b64_data,
-        "media_category": "tweet_image",
-    }
-
-    header = _oauth_header("POST", url)
-    resp = requests.post(url, data=params, headers={"Authorization": header})
+        files = {"media": f}
+        header = _oauth_header("POST", url)
+        resp = requests.post(
+            url,
+            files=files,
+            headers={"Authorization": header},
+        )
 
     if resp.status_code not in (200, 201, 202):
         print(f"Media upload failed ({resp.status_code}): {resp.text}")
@@ -163,7 +162,7 @@ if __name__ == "__main__":
 
     tweet_text = data.get("tweet_text", "")
     image_path = data.get("png_path", "")
-    reply_text = data.get("reply_text", "")  # used by headlines for source links
+    reply_text = data.get("reply_text", "")
 
     if not tweet_text or not image_path:
         print(f"No tweet_text or png_path in {json_path}. Skipping.")
