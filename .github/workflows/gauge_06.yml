@@ -1,0 +1,33 @@
+name: "06:00 — Sentiment Gauge (Type A)"
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 06:00 UTC daily
+  workflow_dispatch:       # manual trigger for testing
+
+jobs:
+  gauge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run gauge script
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
+        run: python scripts/gauge_type_a.py
+
+      - name: Upload outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gauge-outputs-${{ github.run_id }}
+          path: gdelt_bq_results/
+          retention-days: 30

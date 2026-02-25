@@ -1,0 +1,49 @@
+name: "12:00 — Coin Rankings (Type B)"
+
+on:
+  schedule:
+    - cron: '0 12 * * *'  # 12:00 UTC daily
+  workflow_dispatch:        # manual trigger for testing
+
+jobs:
+  rankings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Determine which ranking to run (B1→B2→B3 rotation)
+        id: pick
+        run: |
+          DAY=$(date +%j)  # day of year
+          MOD=$(( DAY % 3 ))
+          if [ $MOD -eq 0 ]; then
+            echo "script=scripts/ranking_b1_volume.py" >> $GITHUB_OUTPUT
+            echo "name=B1-Volume" >> $GITHUB_OUTPUT
+          elif [ $MOD -eq 1 ]; then
+            echo "script=scripts/ranking_b2_sentiment.py" >> $GITHUB_OUTPUT
+            echo "name=B2-Sentiment" >> $GITHUB_OUTPUT
+          else
+            echo "script=scripts/ranking_b3_movers.py" >> $GITHUB_OUTPUT
+            echo "name=B3-Movers" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run ranking (${{ steps.pick.outputs.name }})
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
+        run: python ${{ steps.pick.outputs.script }}
+
+      - name: Upload outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ranking-${{ steps.pick.outputs.name }}-${{ github.run_id }}
+          path: gdelt_bq_results/
+          retention-days: 30

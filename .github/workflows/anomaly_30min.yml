@@ -1,0 +1,55 @@
+name: "Every 30min — Anomaly Alerts (Type C)"
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # every 30 minutes
+  workflow_dispatch:          # manual trigger for testing
+
+jobs:
+  anomaly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore dedup log
+        run: |
+          mkdir -p gdelt_bq_results
+          if [ -f data/anomaly_dedup_log.json ]; then
+            cp data/anomaly_dedup_log.json gdelt_bq_results/anomaly_dedup_log.json
+            echo "Restored dedup log"
+          else
+            echo "No existing dedup log"
+          fi
+
+      - name: Run anomaly detection
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
+        run: python scripts/anomaly_alerts_c.py
+
+      - name: Save dedup log back to repo
+        run: |
+          mkdir -p data
+          if [ -f gdelt_bq_results/anomaly_dedup_log.json ]; then
+            cp gdelt_bq_results/anomaly_dedup_log.json data/anomaly_dedup_log.json
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add data/anomaly_dedup_log.json
+            git diff --cached --quiet || git commit -m "Update anomaly dedup log [skip ci]"
+            git push
+          fi
+
+      - name: Upload outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: anomaly-outputs-${{ github.run_id }}
+          path: gdelt_bq_results/
+          retention-days: 30

@@ -1,0 +1,8 @@
+google-cloud-bigquery
+pandas
+pyarrow
+matplotlib
+numpy
+requests
+anthropic
+db-dtypes

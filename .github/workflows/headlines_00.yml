@@ -1,0 +1,32 @@
+name: "00:00 — Extreme Headlines (Type D)"
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 00:00 UTC daily
+  workflow_dispatch:       # manual trigger for testing
+
+jobs:
+  headlines:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run extreme headlines script
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/extreme_headlines_d.py
+
+      - name: Upload outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: headlines-outputs-${{ github.run_id }}
+          path: gdelt_bq_results/
+          retention-days: 30
