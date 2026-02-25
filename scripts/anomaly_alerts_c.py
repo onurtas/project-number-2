@@ -422,3 +422,14 @@ if len(final_anomalies) > 0:
     print(f"\nCharacter count: {len(tweet)}")
 else:
     print("\nAnomali yok — tweet oluşturulmadı.")
+
+# ---------- 9) SAVE POST METADATA ----------
+if len(final_anomalies) > 0:
+    post_meta = {
+        "tweet_text": tweet,
+        "png_path": str(png_path),
+    }
+    post_path = OUTDIR / f"anomaly_alert_{tag}_post.json"
+    with open(post_path, "w") as f:
+        json.dump(post_meta, f, indent=2, ensure_ascii=False)
+    print(f"Saved: {post_path}")

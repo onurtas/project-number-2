@@ -523,3 +523,14 @@ with open(tweet_path, "w") as f:
     f.write("\n\n=== REPLY TWEET (links) ===\n")
     f.write(tweet_reply)
 print(f"Saved: {tweet_path}")
+
+# ---------- 10) SAVE POST METADATA ----------
+post_meta = {
+    "tweet_text": tweet_main,
+    "png_path": str(png_path),
+    "reply_text": tweet_reply,
+}
+post_path = OUTDIR / f"extreme_headlines_{tag}_post.json"
+with open(post_path, "w") as f:
+    json.dump(post_meta, f, indent=2, ensure_ascii=False)
+print(f"Saved: {post_path}")

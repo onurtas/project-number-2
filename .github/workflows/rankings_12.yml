@@ -2,8 +2,8 @@ name: "12:00 — Coin Rankings (Type B)"
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # 12:00 UTC daily
-  workflow_dispatch:        # manual trigger for testing
+    - cron: '0 12 * * *'
+  workflow_dispatch:
 
 jobs:
   rankings:
@@ -21,7 +21,7 @@ jobs:
       - name: Determine which ranking to run (B1→B2→B3 rotation)
         id: pick
         run: |
-          DAY=$(date +%j)  # day of year
+          DAY=$(date +%j)
           MOD=$(( DAY % 3 ))
           if [ $MOD -eq 0 ]; then
             echo "script=scripts/ranking_b1_volume.py" >> $GITHUB_OUTPUT
@@ -39,6 +39,20 @@ jobs:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
         run: python ${{ steps.pick.outputs.script }}
+
+      - name: Post to X
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+        run: |
+          POST_JSON=$(ls gdelt_bq_results/*_post.json 2>/dev/null | head -1)
+          if [ -n "$POST_JSON" ]; then
+            python scripts/twitter_poster.py "$POST_JSON" ranking
+          else
+            echo "No post JSON found, skipping tweet"
+          fi
 
       - name: Upload outputs
         uses: actions/upload-artifact@v4

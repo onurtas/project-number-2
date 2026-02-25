@@ -529,3 +529,13 @@ print("TWEET PREVIEW")
 print("="*50)
 print(tweet_text)
 print(f"\nCharacter count: {len(tweet_text)}")
+
+# ---------- 10) SAVE POST METADATA ----------
+post_meta = {
+    "tweet_text": tweet_text,
+    "png_path": str(png_path),
+}
+post_path = OUTDIR / f"sentiment_gauge_{tag}_post.json"
+with open(post_path, "w") as f:
+    json.dump(post_meta, f, indent=2, ensure_ascii=False)
+print(f"Saved: {post_path}")

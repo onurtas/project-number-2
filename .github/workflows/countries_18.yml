@@ -2,8 +2,8 @@ name: "18:00 — Country Comparisons (Type E)"
 
 on:
   schedule:
-    - cron: '0 18 * * *'  # 18:00 UTC daily
-  workflow_dispatch:        # manual trigger for testing
+    - cron: '0 18 * * *'
+  workflow_dispatch:
 
 jobs:
   countries:
@@ -23,6 +23,20 @@ jobs:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
         run: python scripts/country_comparison_e.py
+
+      - name: Post to X
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+        run: |
+          POST_JSON=$(ls gdelt_bq_results/*_post.json 2>/dev/null | head -1)
+          if [ -n "$POST_JSON" ]; then
+            python scripts/twitter_poster.py "$POST_JSON" countries
+          else
+            echo "No post JSON found, skipping tweet"
+          fi
 
       - name: Upload outputs
         uses: actions/upload-artifact@v4

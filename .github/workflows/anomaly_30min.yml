@@ -2,8 +2,8 @@ name: "Every 30min — Anomaly Alerts (Type C)"
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # every 30 minutes
-  workflow_dispatch:          # manual trigger for testing
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
 
 jobs:
   anomaly:
@@ -33,6 +33,20 @@ jobs:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
         run: python scripts/anomaly_alerts_c.py
+
+      - name: Post to X (only if anomalies found)
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+        run: |
+          POST_JSON=$(ls gdelt_bq_results/*_post.json 2>/dev/null | head -1)
+          if [ -n "$POST_JSON" ]; then
+            python scripts/twitter_poster.py "$POST_JSON" anomaly
+          else
+            echo "No anomalies detected, skipping tweet"
+          fi
 
       - name: Save dedup log back to repo
         run: |
