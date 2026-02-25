@@ -399,21 +399,27 @@ print(f"Saved: {json_path}")
 # ---------- 8) TWEET TEXT ----------
 if len(final_anomalies) > 0:
     tweet = (
-        f"🚨 Kripto Duygu Anomalisi\n"
+        f"Kripto Duygu Anomalisi\n"
         f"{NOW_UTC.strftime('%d.%m.%Y %H:%M')} UTC\n\n"
     )
     for row in final_anomalies:
-        icon = "📈" if row["direction"] == "positive" else "📉"
-        direction_tr = "YÜKSELİŞ" if row["direction"] == "positive" else "DÜŞÜŞ"
-        tweet += (
-            f"{icon} {row['label']}: {direction_tr}\n"
-            f"   Ton: {row['tone_current']:+.2f} (30g ort: {row['tone_baseline']:+.2f})\n"
-            f"   Değişim: {row['pct_change']:+.0%} | {int(row['n_current'])} haber\n\n"
+        arrow = "▲" if row["direction"] == "positive" else "▼"
+        direction_tr = "YUKSELIS" if row["direction"] == "positive" else "DUSUS"
+        line = (
+            f"{arrow} {row['label']}: {direction_tr}\n"
+            f"  Ton: {row['tone_current']:+.2f} (30g: {row['tone_baseline']:+.2f})\n"
+            f"  Degisim: {row['pct_change']:+.0%} | {int(row['n_current'])} haber\n\n"
         )
+        if len(tweet) + len(line) + 60 > 280:  # leave room for footer
+            break
+        tweet += line
     tweet += (
-        f"Kaynak: GDELT | Yatırım tavsiyesi değildir.\n"
+        f"Kaynak: GDELT | Yatirim tavsiyesi degildir.\n"
         f"#KriptoHaber #Bitcoin"
     )
+    # Hard truncate as safety net
+    if len(tweet) > 280:
+        tweet = tweet[:277] + "..."
 
     print("\n" + "="*50)
     print("TWEET PREVIEW")
