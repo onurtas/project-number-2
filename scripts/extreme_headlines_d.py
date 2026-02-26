@@ -464,43 +464,65 @@ print(f"Saved: {json_path}")
 
 # ---------- 7) MAIN TWEET (image + summary) ----------
 tweet_main = (
-    f"Aşırı Duygu Taşıyan Kripto Haberleri\n"
+    f"Asiri Duygu Tasiyan Kripto Haberleri\n"
     f"{NOW_UTC.strftime('%d.%m.%Y %H:%M')} UTC\n\n"
 )
 
 if final_positive:
-    tweet_main += "🟢 En Pozitif:\n"
+    tweet_main += "[+] En Pozitif:\n"
     for a in final_positive:
         title = (a.get("title_tr") or a["title"])
-        if len(title) > 65:
-            title = title[:62] + "..."
-        tweet_main += f"  [{a['tone_score']:+d}] {title}\n"
+        if len(title) > 55:
+            title = title[:52] + "..."
+        line = f"  [{a['tone_score']:+d}] {title}\n"
+        if len(tweet_main) + len(line) + 80 > 280:
+            break
+        tweet_main += line
 
 if final_negative:
-    tweet_main += "\n🔴 En Negatif:\n"
-    for a in final_negative:
-        title = (a.get("title_tr") or a["title"])
-        if len(title) > 65:
-            title = title[:62] + "..."
-        tweet_main += f"  [{a['tone_score']:+d}] {title}\n"
+    neg_header = "\n[-] En Negatif:\n"
+    if len(tweet_main) + len(neg_header) + 80 < 280:
+        tweet_main += neg_header
+        for a in final_negative:
+            title = (a.get("title_tr") or a["title"])
+            if len(title) > 55:
+                title = title[:52] + "..."
+            line = f"  [{a['tone_score']:+d}] {title}\n"
+            if len(tweet_main) + len(line) + 60 > 280:
+                break
+            tweet_main += line
 
 tweet_main += (
-    f"\nKaynak: GDELT | Yatırım tavsiyesi değildir.\n"
-    f"#KriptoHaber #Bitcoin #Ethereum"
+    f"\nKaynak: GDELT | Yatirim tavsiyesi degildir.\n"
+    f"#KriptoHaber #Bitcoin"
 )
 
+if len(tweet_main) > 280:
+    tweet_main = tweet_main[:277] + "..."
+
 # ---------- 8) REPLY TWEET (source links) ----------
-tweet_reply = "🔗 Haber Kaynakları:\n\n"
+tweet_reply = "Haber Kaynaklari:\n\n"
 
 if final_positive:
-    tweet_reply += "🟢 Pozitif:\n"
+    tweet_reply += "[+] Pozitif:\n"
     for i, a in enumerate(final_positive, 1):
-        tweet_reply += f"{i}. {a['url']}\n"
+        line = f"{i}. {a['url']}\n"
+        if len(tweet_reply) + len(line) + 40 > 280:
+            break
+        tweet_reply += line
 
 if final_negative:
-    tweet_reply += "\n🔴 Negatif:\n"
-    for i, a in enumerate(final_negative, 1):
-        tweet_reply += f"{i}. {a['url']}\n"
+    neg_section = "\n[-] Negatif:\n"
+    if len(tweet_reply) + len(neg_section) + 40 < 280:
+        tweet_reply += neg_section
+        for i, a in enumerate(final_negative, 1):
+            line = f"{i}. {a['url']}\n"
+            if len(tweet_reply) + len(line) > 280:
+                break
+            tweet_reply += line
+
+if len(tweet_reply) > 280:
+    tweet_reply = tweet_reply[:277] + "..."
 
 # ---------- 9) PRINT RESULTS ----------
 print("\n" + "="*50)

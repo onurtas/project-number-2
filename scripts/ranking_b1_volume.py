@@ -326,7 +326,7 @@ tweet = (
     f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}sa)\n\n"
 )
 for i, (_, row) in enumerate(df.head(TOP_N).iterrows(), 1):
-    medal = "🥇" if i == 1 else ("🥈" if i == 2 else ("🥉" if i == 3 else f"{i}."))
+    medal = f"{i}."
     tweet += f"{medal} {row['label']}: {int(row['n_articles'])} haber ({fv(row['avg_tone'])})\n"
 
 tweet += (
