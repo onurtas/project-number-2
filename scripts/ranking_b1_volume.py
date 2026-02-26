@@ -322,18 +322,22 @@ top3 = df.head(3)
 def fv(v): return f"{v:+.1f}" if pd.notna(v) else "N/A"
 
 tweet = (
-    f"En Çok Haber Alan Kripto Paralar\n"
+    f"En Cok Haber Alan Kripto Paralar\n"
     f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}sa)\n\n"
 )
 for i, (_, row) in enumerate(df.head(TOP_N).iterrows(), 1):
-    medal = f"{i}."
-    tweet += f"{medal} {row['label']}: {int(row['n_articles'])} haber ({fv(row['avg_tone'])})\n"
+    line = f"{i}. {row['label']}: {int(row['n_articles'])} haber ({fv(row['avg_tone'])})\n"
+    if len(tweet) + len(line) + 60 > 280:
+        break
+    tweet += line
 
 tweet += (
-    f"\nToplam: {total_articles:,} haber | {total_coins_with_data} coin\n"
-    f"Yatırım tavsiyesi değildir.\n"
-    f"#KriptoHaber #Bitcoin #Ethereum"
+    f"\nYatirim tavsiyesi degildir.\n"
+    f"#KriptoHaber #Bitcoin"
 )
+
+if len(tweet) > 280:
+    tweet = tweet[:277] + "..."
 
 print("\n" + "="*50)
 print("TWEET PREVIEW")

@@ -361,28 +361,23 @@ def fv(v): return f"{v:+.1f}" if pd.notna(v) else "N/A"
 df_fixed_sorted = df_fixed.sort_values("n_articles", ascending=False)
 
 tweet = (
-    f"Kripto Haber — Yayınlanan Haber Sayısı ve Ortalama Duygu\n"
+    f"Kripto Haber - Ulke Karsilastirmasi\n"
     f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}sa)\n\n"
-    f"Büyük Piyasalar:\n"
 )
 for _, row in df_fixed_sorted.head(10).iterrows():
     n = int(row["n_articles"])
-    tweet += f"  {row['country_tr']}: {n} haber ({fv(row['avg_tone'])})\n"
-
-# Most positive and most negative from fixed markets
-df_fixed_tone = df_fixed_sorted[df_fixed_sorted["n_articles"] > 0].dropna(subset=["avg_tone"])
-if len(df_fixed_tone) >= 2:
-    most_pos = df_fixed_tone.loc[df_fixed_tone["avg_tone"].idxmax()]
-    most_neg = df_fixed_tone.loc[df_fixed_tone["avg_tone"].idxmin()]
-    tweet += (
-        f"\nEn pozitif: {most_pos['country_tr']} ({fv(most_pos['avg_tone'])})\n"
-        f"En negatif: {most_neg['country_tr']} ({fv(most_neg['avg_tone'])})\n"
-    )
+    line = f"  {row['country_tr']}: {n} haber ({fv(row['avg_tone'])})\n"
+    if len(tweet) + len(line) + 60 > 280:
+        break
+    tweet += line
 
 tweet += (
-    f"\nYatırım tavsiyesi değildir.\n"
-    f"#KriptoHaber #Bitcoin #Ethereum"
+    f"\nYatirim tavsiyesi degildir.\n"
+    f"#KriptoHaber #Bitcoin"
 )
+
+if len(tweet) > 280:
+    tweet = tweet[:277] + "..."
 
 print("\n" + "="*50)
 print("TWEET PREVIEW")

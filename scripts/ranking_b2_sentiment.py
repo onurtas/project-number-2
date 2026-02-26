@@ -349,21 +349,32 @@ else:
     def fv(v): return f"{v:+.2f}" if pd.notna(v) else "N/A"
 
     tweet = (
-        f"Kripto Duygu Sıralaması (ABD)\n"
+        f"Kripto Duygu Siralamasi (ABD)\n"
         f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}sa)\n\n"
         f"En Pozitif:\n"
     )
     for i, (_, row) in enumerate(top_positive.iterrows(), 1):
-        tweet += f"  {i}. {row['label']}: {fv(row['avg_tone'])} ({int(row['n_articles'])} haber)\n"
+        line = f"  {i}. {row['label']}: {fv(row['avg_tone'])}\n"
+        if len(tweet) + len(line) + 80 > 280:
+            break
+        tweet += line
 
-    tweet += f"\nEn Negatif:\n"
-    for i, (_, row) in enumerate(top_negative.iloc[::-1].iterrows(), 1):
-        tweet += f"  {i}. {row['label']}: {fv(row['avg_tone'])} ({int(row['n_articles'])} haber)\n"
+    neg_header = f"\nEn Negatif:\n"
+    if len(tweet) + len(neg_header) + 60 < 280:
+        tweet += neg_header
+        for i, (_, row) in enumerate(top_negative.iloc[::-1].iterrows(), 1):
+            line = f"  {i}. {row['label']}: {fv(row['avg_tone'])}\n"
+            if len(tweet) + len(line) + 60 > 280:
+                break
+            tweet += line
 
     tweet += (
-        f"\nYatırım tavsiyesi değildir.\n"
-        f"#KriptoDuygu #Bitcoin #Ethereum"
+        f"\nYatirim tavsiyesi degildir.\n"
+        f"#KriptoDuygu #Bitcoin"
     )
+
+    if len(tweet) > 280:
+        tweet = tweet[:277] + "..."
 
     print("\n" + "="*50)
     print("TWEET PREVIEW")

@@ -323,21 +323,32 @@ else:
     def fv(v): return f"{v:+.2f}" if pd.notna(v) else "N/A"
 
     tweet = (
-        f"En Büyük Duygu Değişimleri\n"
+        f"En Buyuk Duygu Degisimleri\n"
         f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}sa vs 30g)\n\n"
-        f"En Çok İyileşen:\n"
+        f"En Cok Iyilesen:\n"
     )
     for i, (_, row) in enumerate(top_risers.iterrows(), 1):
-        tweet += f"  {i}. {row['label']}: {fv(row['tone_delta'])} ({fv(row['tone_current'])} ← {fv(row['tone_baseline'])})\n"
+        line = f"  {i}. {row['label']}: {fv(row['tone_delta'])}\n"
+        if len(tweet) + len(line) + 80 > 280:
+            break
+        tweet += line
 
-    tweet += f"\nEn Çok Kötüleşen:\n"
-    for i, (_, row) in enumerate(top_fallers.iloc[::-1].iterrows(), 1):
-        tweet += f"  {i}. {row['label']}: {fv(row['tone_delta'])} ({fv(row['tone_current'])} ← {fv(row['tone_baseline'])})\n"
+    neg_header = f"\nEn Cok Kotulesen:\n"
+    if len(tweet) + len(neg_header) + 60 < 280:
+        tweet += neg_header
+        for i, (_, row) in enumerate(top_fallers.iloc[::-1].iterrows(), 1):
+            line = f"  {i}. {row['label']}: {fv(row['tone_delta'])}\n"
+            if len(tweet) + len(line) + 60 > 280:
+                break
+            tweet += line
 
     tweet += (
-        f"\nYatırım tavsiyesi değildir.\n"
-        f"#KriptoDuygu #Bitcoin #Ethereum"
+        f"\nYatirim tavsiyesi degildir.\n"
+        f"#KriptoDuygu #Bitcoin"
     )
+
+    if len(tweet) > 280:
+        tweet = tweet[:277] + "..."
 
     print("\n" + "="*50)
     print("TWEET PREVIEW")
