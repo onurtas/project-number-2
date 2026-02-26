@@ -464,7 +464,7 @@ fig.text(0.5, 0.05, summary,
 
 # Simplified footer
 fig.text(0.5, 0.02,
-         "Kaynak: GDELT  |  Yatırım tavsiyesi değildir.",
+         "Yatırım tavsiyesi değildir.",
          ha="center", fontsize=8, color="#9CA3AF")
 
 plt.tight_layout(rect=[0, 0.04, 1, 0.95])
@@ -519,7 +519,7 @@ def format_tweet(gauge_global, gauge_us, window_end):
         f"  30g: {fv(g['avg_30d'])} | 6a: {fv(g['avg_6m'])} | {g['n_articles_current']:,} haber\n\n"
         f"ABD: {fv(u['current'])} ({tone_label(u['current'])}) {arrow(u['current'], u['avg_30d'])}\n"
         f"  30g: {fv(u['avg_30d'])} | 6a: {fv(u['avg_6m'])} | {u['n_articles_current']:,} haber\n\n"
-        f"Kaynak: GDELT | Yatırım tavsiyesi değildir.\n"
+        f"Yatırım tavsiyesi değildir.\n"
         f"#KriptoDuygu #Bitcoin #Ethereum"
     )
 

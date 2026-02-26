@@ -324,7 +324,7 @@ else:
 
 # Footer
 fig.text(0.5, 0.01,
-         f"Kaynak: GDELT  |  20 anahtar kelime  |  {total_countries} ülke  |  Toplam {total_articles:,} haber  |  Yatırım tavsiyesi değildir.",
+         f"Yatırım tavsiyesi değildir.",
          ha="center", fontsize=7, color="#9CA3AF")
 
 plt.tight_layout(rect=[0, 0.03, 1, 1])
@@ -380,7 +380,7 @@ if len(df_fixed_tone) >= 2:
     )
 
 tweet += (
-    f"\nKaynak: GDELT | Yatırım tavsiyesi değildir.\n"
+    f"\nYatırım tavsiyesi değildir.\n"
     f"#KriptoHaber #Bitcoin #Ethereum"
 )
 

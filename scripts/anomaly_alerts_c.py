@@ -353,7 +353,7 @@ else:
     # Footer
     footer_y = max(y - 0.05, 0.02)
     ax.text(0.5, footer_y,
-            f"Kaynak: GDELT  |  Eşik: ±{ANOMALY_THRESHOLD:.0%}  |  Min {MIN_ARTICLES_CURRENT} haber  |  Yatırım tavsiyesi değildir.",
+            f"Yatırım tavsiyesi değildir.",
             transform=ax.transAxes, ha="center", va="top",
             fontsize=7, color="#9CA3AF")
 
@@ -414,7 +414,7 @@ if len(final_anomalies) > 0:
             break
         tweet += line
     tweet += (
-        f"Kaynak: GDELT | Yatirim tavsiyesi degildir.\n"
+        f"Yatirim tavsiyesi degildir.\n"
         f"#KriptoHaber #Bitcoin"
     )
     # Hard truncate as safety net

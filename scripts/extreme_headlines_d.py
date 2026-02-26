@@ -411,9 +411,9 @@ else:
     # Footer positioning
     footer_y = max(y - 0.07, 0.02)
 
-    verified_note = "Claude Sonnet ile doğrulandı ve çevrildi" if ANTHROPIC_API_KEY != "YOUR_API_KEY_HERE" else "Doğrulanmadı"
+    verified_note = ""
     ax.text(0.5, footer_y,
-            f"Kaynak: GDELT DOC API  |  {verified_note}  |  Yatırım tavsiyesi değildir.",
+            f"Yatırım tavsiyesi değildir.",
             transform=ax.transAxes, ha="center", va="top",
             fontsize=7, color="#9CA3AF")
 
@@ -493,7 +493,7 @@ if final_negative:
             tweet_main += line
 
 tweet_main += (
-    f"\nKaynak: GDELT | Yatirim tavsiyesi degildir.\n"
+    f"\nYatirim tavsiyesi degildir.\n"
     f"#KriptoHaber #Bitcoin"
 )
 

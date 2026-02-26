@@ -313,7 +313,7 @@ else:
 
     # Footer
     fig.text(0.5, 0.01,
-             f"Kaynak: GDELT  |  Min. {MIN_ARTICLES} haber  |  {total_qualified} coin sıralandı  |  Toplam {total_articles:,} haber  |  Yatırım tavsiyesi değildir.",
+             f"Yatırım tavsiyesi değildir.",
              ha="center", fontsize=7, color="#9CA3AF")
 
     plt.tight_layout(rect=[0, 0.04, 1, 1])
@@ -361,7 +361,7 @@ else:
         tweet += f"  {i}. {row['label']}: {fv(row['avg_tone'])} ({int(row['n_articles'])} haber)\n"
 
     tweet += (
-        f"\nKaynak: GDELT | Yatırım tavsiyesi değildir.\n"
+        f"\nYatırım tavsiyesi değildir.\n"
         f"#KriptoDuygu #Bitcoin #Ethereum"
     )
 

@@ -287,7 +287,7 @@ fig.text(0.5, 0.04, summary,
 
 # Footer
 fig.text(0.5, 0.01,
-         f"Kaynak: GDELT  |  {total_coins_with_data} coin analiz edildi  |  Toplam {total_articles:,} haber  |  Yatırım tavsiyesi değildir.",
+         f"Yatırım tavsiyesi değildir.",
          ha="center", fontsize=7, color="#9CA3AF")
 
 plt.tight_layout(rect=[0, 0.04, 1, 1])
@@ -331,7 +331,7 @@ for i, (_, row) in enumerate(df.head(TOP_N).iterrows(), 1):
 
 tweet += (
     f"\nToplam: {total_articles:,} haber | {total_coins_with_data} coin\n"
-    f"Kaynak: GDELT | Yatırım tavsiyesi değildir.\n"
+    f"Yatırım tavsiyesi değildir.\n"
     f"#KriptoHaber #Bitcoin #Ethereum"
 )
 
