@@ -1,9 +1,12 @@
-name: "Every 30min — Anomaly Alerts (Type C)"
+name: "Hourly — Anomaly Alerts (Type C)"
 
 on:
   schedule:
     - cron: '0 * * * *'  # every hour
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   anomaly:
