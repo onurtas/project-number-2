@@ -500,29 +500,28 @@ tweet_main += (
 if len(tweet_main) > 280:
     tweet_main = tweet_main[:277] + "..."
 
-# ---------- 8) REPLY TWEET (source links) ----------
-tweet_reply = "Haber Kaynaklari:\n\n"
+# ---------- 8) REPLY TWEETS (source links as thread) ----------
+reply_tweets = []
 
+# Reply 1: Positive article links
 if final_positive:
-    tweet_reply += "[+] Pozitif:\n"
+    reply_pos = "[+] Pozitif Haberler:\n\n"
     for i, a in enumerate(final_positive, 1):
         line = f"{i}. {a['url']}\n"
-        if len(tweet_reply) + len(line) + 40 > 280:
+        if len(reply_pos) + len(line) > 275:
             break
-        tweet_reply += line
+        reply_pos += line
+    reply_tweets.append(reply_pos.strip())
 
+# Reply 2: Negative article links
 if final_negative:
-    neg_section = "\n[-] Negatif:\n"
-    if len(tweet_reply) + len(neg_section) + 40 < 280:
-        tweet_reply += neg_section
-        for i, a in enumerate(final_negative, 1):
-            line = f"{i}. {a['url']}\n"
-            if len(tweet_reply) + len(line) > 280:
-                break
-            tweet_reply += line
-
-if len(tweet_reply) > 280:
-    tweet_reply = tweet_reply[:277] + "..."
+    reply_neg = "[-] Negatif Haberler:\n\n"
+    for i, a in enumerate(final_negative, 1):
+        line = f"{i}. {a['url']}\n"
+        if len(reply_neg) + len(line) > 275:
+            break
+        reply_neg += line
+    reply_tweets.append(reply_neg.strip())
 
 # ---------- 9) PRINT RESULTS ----------
 print("\n" + "="*50)
@@ -531,26 +530,28 @@ print("="*50)
 print(tweet_main)
 print(f"Characters: {len(tweet_main)}")
 
-print("\n" + "="*50)
-print("REPLY TWEET (source links)")
-print("="*50)
-print(tweet_reply)
-print(f"Characters: {len(tweet_reply)}")
+for idx, rt in enumerate(reply_tweets):
+    print(f"\n{'='*50}")
+    print(f"REPLY TWEET {idx+1}")
+    print("="*50)
+    print(rt)
+    print(f"Characters: {len(rt)}")
 
 # Save tweet texts
 tweet_path = OUTDIR / f"extreme_headlines_{tag}_tweets.txt"
 with open(tweet_path, "w") as f:
     f.write("=== MAIN TWEET ===\n")
     f.write(tweet_main)
-    f.write("\n\n=== REPLY TWEET (links) ===\n")
-    f.write(tweet_reply)
+    for idx, rt in enumerate(reply_tweets):
+        f.write(f"\n\n=== REPLY TWEET {idx+1} ===\n")
+        f.write(rt)
 print(f"Saved: {tweet_path}")
 
 # ---------- 10) SAVE POST METADATA ----------
 post_meta = {
     "tweet_text": tweet_main,
     "png_path": str(png_path),
-    "reply_text": tweet_reply,
+    "reply_tweets": reply_tweets,
 }
 post_path = OUTDIR / f"extreme_headlines_{tag}_post.json"
 with open(post_path, "w") as f:

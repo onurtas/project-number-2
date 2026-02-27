@@ -118,32 +118,45 @@ def post_tweet(text, media_id=None, reply_to_id=None):
     return tweet_id
 
 
-def post_with_image(tweet_text, image_path, reply_text=None):
+def post_with_image(tweet_text, image_path, reply_text=None, reply_tweets=None):
     """
-    Post a tweet with an image. Optionally post a reply tweet.
-    Returns (main_tweet_id, reply_tweet_id).
+    Post a tweet with an image. Optionally post reply tweet(s).
+    reply_text: single reply string (legacy)
+    reply_tweets: list of reply strings (thread)
+    Returns (main_tweet_id, [reply_ids]).
     """
     if not all([API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET]):
         print("ERROR: Twitter credentials not set. Skipping post.")
-        return None, None
+        return None, []
 
     # Upload image
     media_id = upload_media(image_path)
     if not media_id:
-        return None, None
+        return None, []
 
     # Post main tweet with image
     main_id = post_tweet(tweet_text, media_id=media_id)
     if not main_id:
-        return None, None
+        return None, []
 
-    # Post reply if provided
-    reply_id = None
-    if reply_text:
-        time.sleep(2)  # brief pause
-        reply_id = post_tweet(reply_text, reply_to_id=main_id)
+    # Build list of replies
+    replies = []
+    if reply_tweets and isinstance(reply_tweets, list):
+        replies = reply_tweets
+    elif reply_text:
+        replies = [reply_text]
 
-    return main_id, reply_id
+    # Post reply thread
+    reply_ids = []
+    last_id = main_id
+    for rt in replies:
+        time.sleep(2)
+        rid = post_tweet(rt, reply_to_id=last_id)
+        if rid:
+            reply_ids.append(rid)
+            last_id = rid  # chain replies
+
+    return main_id, reply_ids
 
 
 # --- CLI interface ---
@@ -163,6 +176,7 @@ if __name__ == "__main__":
     tweet_text = data.get("tweet_text", "")
     image_path = data.get("png_path", "")
     reply_text = data.get("reply_text", "")
+    reply_tweets = data.get("reply_tweets", [])
 
     if not tweet_text or not image_path:
         print(f"No tweet_text or png_path in {json_path}. Skipping.")
@@ -175,15 +189,21 @@ if __name__ == "__main__":
     print(f"Posting {post_type}...")
     print(f"  Text: {tweet_text[:100]}...")
     print(f"  Image: {image_path}")
-    if reply_text:
+    if reply_tweets:
+        print(f"  Reply tweets: {len(reply_tweets)}")
+    elif reply_text:
         print(f"  Reply: {reply_text[:100]}...")
 
-    main_id, reply_id = post_with_image(tweet_text, image_path, reply_text or None)
+    main_id, reply_ids = post_with_image(
+        tweet_text, image_path,
+        reply_text=reply_text or None,
+        reply_tweets=reply_tweets or None,
+    )
 
     if main_id:
         print(f"SUCCESS — Tweet ID: {main_id}")
-        if reply_id:
-            print(f"Reply ID: {reply_id}")
+        for i, rid in enumerate(reply_ids):
+            print(f"Reply {i+1} ID: {rid}")
     else:
         print("FAILED to post tweet")
         sys.exit(1)
