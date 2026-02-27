@@ -246,7 +246,7 @@ else:
     ax.axvline(x=0, color="#374151", linewidth=1, zorder=3)
 
     # X-axis
-    ax.set_xlabel("Ton Değişimi (6sa vs 30 gün)", fontsize=11, color="#4B5563", fontweight="bold")
+    ax.set_xlabel(ar("تغير النبرة (6 ساعات مقابل 30 يوم)"), fontsize=11, color="#4B5563", fontweight="bold")
 
     # Symmetric x-axis
     max_abs = max(abs(deltas.min()), abs(deltas.max()), 1) * 1.4
@@ -264,14 +264,14 @@ else:
                  fontsize=17, fontweight="bold", color="#111827", pad=20)
 
     # Subtitle
-    window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}sa vs 30 gün)"
+    window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}h vs 30d)"
     ax.text(0.5, 1.02, window_label,
             transform=ax.transAxes, ha="center", fontsize=10, color="#6B7280")
 
     # Direction annotations
-    ax.text(-max_abs * 0.95, len(df_show) + 0.3, "← Kötüleşen",
+    ax.text(-max_abs * 0.95, len(df_show) + 0.3, ar("تراجع") + " ←",
             ha="left", fontsize=9, color="#DC2626", fontweight="bold")
-    ax.text(max_abs * 0.95, len(df_show) + 0.3, "İyileşen →",
+    ax.text(max_abs * 0.95, len(df_show) + 0.3, "→ " + ar("تحسن"),
             ha="right", fontsize=9, color="#16A34A", fontweight="bold")
 
     # Auto-generated summary
@@ -325,7 +325,7 @@ else:
 
     tweet = (
         f"أكبر تغيرات المعنويات\n"
-        f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}sa vs 30g)\n\n"
+        f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}h vs 30d)\n\n"
         f"الأكثر تحسناً:\n"
     )
     for i, (_, row) in enumerate(top_risers.iterrows(), 1):

@@ -451,15 +451,11 @@ draw_speedometer(ax2,
     window_used=gauge_us["window_used"]
 )
 
-# Auto-generated summary
+# Auto-generated summary (numbers only to avoid bidi mixing issues)
 g_val = gauge_global["current"]
 u_val = gauge_us["current"]
-g_dir = ar("صعود") if g_val > gauge_global["avg_30d"] else ar("هبوط") if g_val < gauge_global["avg_30d"] else ar("مستقر")
-summary = (
-    f"{ar('المعنويات العالمية')} {g_val:+.1f} ({g_dir}), "
-    f"{ar('الولايات المتحدة')} {u_val:+.1f}. "
-    f"{ar('إجمالي الأخبار:')} {gauge_global['n_articles_current'] + gauge_us['n_articles_current']}"
-)
+total_n = gauge_global['n_articles_current'] + gauge_us['n_articles_current']
+summary = f"{ar('عالمي')}: {g_val:+.1f}  |  {ar('أمريكا')}: {u_val:+.1f}  |  {ar('إجمالي')}: {total_n}"
 fig.text(0.5, 0.05, summary,
          ha="center", fontsize=7.5, color="#6B7280", style="italic")
 

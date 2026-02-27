@@ -260,7 +260,7 @@ ax.set_title(ar("العملات الرقمية الأكثر تداولاً في 
              fontsize=17, fontweight="bold", color="#111827", pad=20)
 
 # Subtitle: window info
-window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}sa pencere)"
+window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}h)"
 ax.text(0.5, 1.02, window_label,
         transform=ax.transAxes, ha="center", fontsize=10, color="#6B7280")
 
@@ -324,7 +324,7 @@ def fv(v): return f"{v:+.1f}" if pd.notna(v) else "N/A"
 
 tweet = (
     f"العملات الرقمية الأكثر تداولاً في الأخبار\n"
-    f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}sa)\n\n"
+    f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}h)\n\n"
 )
 for i, (_, row) in enumerate(df.head(TOP_N).iterrows(), 1):
     line = f"{i}. {row['label']}: {int(row['n_articles'])} خبر ({fv(row['avg_tone'])})\n"

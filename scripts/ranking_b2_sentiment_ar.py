@@ -291,23 +291,23 @@ else:
                  fontsize=17, fontweight="bold", color="#111827", pad=20)
 
     # Subtitle
-    window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}sa pencere)"
+    window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}h)"
     ax.text(0.5, 1.02, window_label,
             transform=ax.transAxes, ha="center", fontsize=10, color="#6B7280")
 
     # Annotations for sides
-    ax.text(-max_abs * 0.95, len(df_show) + 0.3, "← Negatif",
+    ax.text(-max_abs * 0.95, len(df_show) + 0.3, ar("سلبي") + " ←",
             ha="left", fontsize=9, color="#DC2626", fontweight="bold")
-    ax.text(max_abs * 0.95, len(df_show) + 0.3, "Pozitif →",
+    ax.text(max_abs * 0.95, len(df_show) + 0.3, "→ " + ar("إيجابي"),
             ha="right", fontsize=9, color="#16A34A", fontweight="bold")
 
     # Auto-generated summary
     most_pos = top_positive.iloc[0]
     most_neg = top_negative.iloc[-1]
     summary = (
-        f"En pozitif: {most_pos['label']} ({most_pos['avg_tone']:+.1f}), "
-        f"en negatif: {most_neg['label']} ({most_neg['avg_tone']:+.1f}). "
-        f"ABD medyasında {total_qualified} coin değerlendirildi."
+        f"{ar('الأكثر إيجابية')}: {most_pos['label']} ({most_pos['avg_tone']:+.1f}), "
+        f"{ar('الأكثر سلبية')}: {most_neg['label']} ({most_neg['avg_tone']:+.1f}). "
+        f"{total_qualified} {ar('عملة')}"
     )
     fig.text(0.5, 0.04, summary,
              ha="center", fontsize=7.5, color="#6B7280", style="italic")
@@ -351,8 +351,8 @@ else:
 
     tweet = (
         f"تصنيف معنويات العملات الرقمية (أمريكا)\n"
-        f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}sa)\n\n"
-        f"En Pozitif:\n"
+        f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}h)\n\n"
+        f"الأكثر إيجابية:\n"
     )
     for i, (_, row) in enumerate(top_positive.iterrows(), 1):
         line = f"  {i}. {row['label']}: {fv(row['avg_tone'])}\n"

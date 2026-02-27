@@ -290,7 +290,7 @@ else:
             transform=ax.transAxes, ha="center", va="top",
             fontsize=17, fontweight="bold", color="#DC2626")
 
-    window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}sa)"
+    window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}h)"
     ax.text(0.5, 0.91, window_label,
             transform=ax.transAxes, ha="center", va="top",
             fontsize=10, color="#6B7280")

@@ -104,6 +104,10 @@ FIPS_TO_AR = {
     "BE": "بلجيكا", "NZ": "نيوزيلندا", "KE": "كينيا", "GH": "غانا",
     "EG": "مصر", "SA": "السعودية",
     "RP": "الفلبين", "UP": "أوكرانيا",
+    "HU": "المجر", "GR": "اليونان", "CZ": "التشيك", "PT": "البرتغال",
+    "RO": "رومانيا", "BG": "بلغاريا", "HR": "كرواتيا", "LY": "ليبيا",
+    "MO": "المغرب", "TS": "تونس", "IZ": "العراق", "IR": "إيران",
+    "QA": "قطر", "BA": "البحرين", "KU": "الكويت", "MU": "عُمان",
 }
 
 # ---------- 4) 20 GAUGE KEYWORDS (same as Type A) ----------
@@ -273,7 +277,7 @@ ax1.xaxis.grid(True, alpha=0.15, color="#9CA3AF")
 ax1.set_title(ar("الأسواق الكبرى — عدد الأخبار ومتوسط النبرة"),
               fontsize=14, fontweight="bold", color="#111827", pad=20)
 
-window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}sa pencere)"
+window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}h)"
 ax1.text(0.5, 1.02, window_label,
          transform=ax1.transAxes, ha="center", fontsize=10, color="#6B7280")
 
@@ -316,10 +320,10 @@ if len(df_dynamic) > 0:
     ax2.tick_params(left=False)
     ax2.xaxis.grid(True, alpha=0.15, color="#9CA3AF")
 
-    ax2.set_title("Diğer Aktif Ülkeler",
+    ax2.set_title(ar("أسواق ديناميكية أخرى"),
                   fontsize=13, fontweight="bold", color="#111827", pad=12)
 else:
-    ax2.text(0.5, 0.5, "Yeterli veri yok", ha="center", va="center",
+    ax2.text(0.5, 0.5, ar("لا توجد بيانات كافية"), ha="center", va="center",
              fontsize=14, color="#9CA3AF", transform=ax2.transAxes)
     ax2.axis("off")
 
@@ -363,7 +367,7 @@ df_fixed_sorted = df_fixed.sort_values("n_articles", ascending=False)
 
 tweet = (
     f"مقارنة أخبار العملات الرقمية بين الدول\n"
-    f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}sa)\n\n"
+    f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}h)\n\n"
 )
 for _, row in df_fixed_sorted.head(10).iterrows():
     n = int(row["n_articles"])
