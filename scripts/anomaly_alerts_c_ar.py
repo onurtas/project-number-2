@@ -338,19 +338,6 @@ else:
 
         y -= item_height
 
-    # Auto-generated summary
-    biggest = max(final_anomalies, key=lambda r: abs(r["pct_change"]))
-    n_up = sum(1 for r in final_anomalies if r["direction"] == "positive")
-    n_down = sum(1 for r in final_anomalies if r["direction"] == "negative")
-    summary = (
-        f"{ar('تم اكتشاف')} {n_alerts} {ar('شذوذ من')} {len(df)} {ar('عملة')} "
-        f"({n_up} {ar('صعود')}, {n_down} {ar('هبوط')}). "
-        f"{ar('أكبر تغير')}: {biggest['label']} ({biggest['pct_change']:+.0%})."
-    )
-    ax.text(0.5, max(y - 0.02, 0.08), summary,
-            transform=ax.transAxes, ha="center", va="top",
-            fontsize=7.5, color="#6B7280", style="italic")
-
     # Footer
     footer_y = max(y - 0.05, 0.02)
     ax.text(0.5, footer_y,

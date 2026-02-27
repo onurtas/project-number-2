@@ -277,15 +277,6 @@ ax.legend(handles=legend_elements, loc="lower right", fontsize=7,
           title=ar("اللون = متوسط النبرة"), title_fontsize=8,
           framealpha=0.9, edgecolor="#D1D5DB")
 
-# Auto-generated summary
-top1 = df.iloc[0]
-summary = (
-    f"{top1['label']}: {int(top1['n_articles'])} {ar('خبر')}. "
-    f"{total_coins_with_data} {ar('عملة')} | {total_articles:,} {ar('خبر إجمالي')}"
-)
-fig.text(0.5, 0.04, summary,
-         ha="center", fontsize=7.5, color="#6B7280", style="italic")
-
 # Footer
 fig.text(0.5, 0.01,
          ar("هذا ليس نصيحة استثمارية."),

@@ -274,17 +274,6 @@ else:
     ax.text(max_abs * 0.95, len(df_show) + 0.3, "→ " + ar("تحسن"),
             ha="right", fontsize=9, color="#16A34A", fontweight="bold")
 
-    # Auto-generated summary
-    biggest_riser = top_risers.iloc[0]
-    biggest_faller = top_fallers.iloc[-1]
-    summary = (
-        f"{ar('الأكثر تحسناً')}: {biggest_riser['label']} ({biggest_riser['tone_delta']:+.2f}), "
-        f"{ar('الأكثر تراجعاً')}: {biggest_faller['label']} ({biggest_faller['tone_delta']:+.2f}). "
-        f"{total_qualified} " + ar("عملة — التغير مقارنة بمتوسط 30 يوم")
-    )
-    fig.text(0.5, 0.04, summary,
-             ha="center", fontsize=7.5, color="#6B7280", style="italic")
-
     # Footer
     fig.text(0.5, 0.01,
              ar("هذا ليس نصيحة استثمارية."),

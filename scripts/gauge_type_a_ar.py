@@ -451,14 +451,6 @@ draw_speedometer(ax2,
     window_used=gauge_us["window_used"]
 )
 
-# Auto-generated summary (numbers only to avoid bidi mixing issues)
-g_val = gauge_global["current"]
-u_val = gauge_us["current"]
-total_n = gauge_global['n_articles_current'] + gauge_us['n_articles_current']
-summary = f"{ar('عالمي')}: {g_val:+.1f}  |  {ar('أمريكا')}: {u_val:+.1f}  |  {ar('إجمالي')}: {total_n}"
-fig.text(0.5, 0.05, summary,
-         ha="center", fontsize=7.5, color="#6B7280", style="italic")
-
 # Simplified footer
 fig.text(0.5, 0.02,
          ar("هذا ليس نصيحة استثمارية."),

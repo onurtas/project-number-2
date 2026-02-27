@@ -301,17 +301,6 @@ else:
     ax.text(max_abs * 0.95, len(df_show) + 0.3, "→ " + ar("إيجابي"),
             ha="right", fontsize=9, color="#16A34A", fontweight="bold")
 
-    # Auto-generated summary
-    most_pos = top_positive.iloc[0]
-    most_neg = top_negative.iloc[-1]
-    summary = (
-        f"{ar('الأكثر إيجابية')}: {most_pos['label']} ({most_pos['avg_tone']:+.1f}), "
-        f"{ar('الأكثر سلبية')}: {most_neg['label']} ({most_neg['avg_tone']:+.1f}). "
-        f"{total_qualified} {ar('عملة')}"
-    )
-    fig.text(0.5, 0.04, summary,
-             ha="center", fontsize=7.5, color="#6B7280", style="italic")
-
     # Footer
     fig.text(0.5, 0.01,
              ar("هذا ليس نصيحة استثمارية."),
