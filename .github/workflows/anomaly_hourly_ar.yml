@@ -1,0 +1,72 @@
+name: "Hourly — Anomaly Alerts AR (Type C)"
+
+on:
+  schedule:
+    - cron: '30 */3 * * *'  # every 3 hours at :30
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  anomaly_ar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore dedup log
+        run: |
+          mkdir -p gdelt_bq_results
+          if [ -f data/anomaly_dedup_log_ar.json ]; then
+            cp data/anomaly_dedup_log_ar.json gdelt_bq_results/anomaly_dedup_log_ar.json
+            echo "Restored Arabic dedup log"
+          else
+            echo "No existing Arabic dedup log"
+          fi
+
+      - name: Run anomaly detection (Arabic)
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
+        run: python scripts/anomaly_alerts_c_ar.py
+
+      - name: Post to X (Arabic, only if anomalies found)
+        env:
+          X_API_KEY: ${{ secrets.X_AR_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_AR_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_AR_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_AR_ACCESS_SECRET }}
+        run: |
+          POST_JSON=$(ls gdelt_bq_results/*_post.json 2>/dev/null | head -1)
+          if [ -n "$POST_JSON" ]; then
+            python scripts/twitter_poster.py "$POST_JSON" anomaly
+          else
+            echo "No anomalies detected, skipping tweet"
+          fi
+
+      - name: Save dedup log back to repo
+        run: |
+          mkdir -p data
+          if [ -f gdelt_bq_results/anomaly_dedup_log_ar.json ]; then
+            cp gdelt_bq_results/anomaly_dedup_log_ar.json data/anomaly_dedup_log_ar.json
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add data/anomaly_dedup_log_ar.json
+            git diff --cached --quiet || git commit -m "Update Arabic anomaly dedup log [skip ci]"
+            git push
+          fi
+
+      - name: Upload outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: anomaly-ar-outputs-${{ github.run_id }}
+          path: gdelt_bq_results/
+          retention-days: 30

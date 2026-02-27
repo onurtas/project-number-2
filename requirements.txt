@@ -6,3 +6,5 @@ numpy
 requests
 anthropic
 db-dtypes
+arabic-reshaper
+python-bidi

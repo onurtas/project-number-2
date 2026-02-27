@@ -1,0 +1,48 @@
+name: "03:00 — Extreme Headlines AR (Type D)"
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  headlines_ar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run extreme headlines (Arabic)
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/extreme_headlines_d_ar.py
+
+      - name: Post to X (Arabic)
+        env:
+          X_API_KEY: ${{ secrets.X_AR_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_AR_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_AR_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_AR_ACCESS_SECRET }}
+        run: |
+          POST_JSON=$(ls gdelt_bq_results/*_post.json 2>/dev/null | head -1)
+          if [ -n "$POST_JSON" ]; then
+            python scripts/twitter_poster.py "$POST_JSON" headlines
+          else
+            echo "No post JSON found, skipping tweet"
+          fi
+
+      - name: Upload outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: headlines-ar-outputs-${{ github.run_id }}
+          path: gdelt_bq_results/
+          retention-days: 30
