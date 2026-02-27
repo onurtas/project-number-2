@@ -210,7 +210,7 @@ else:
     for _, row in df_show.iterrows():
         print(f"  {row['label']:20s}  delta: {row['tone_delta']:+.2f}  "
               f"(now: {row['tone_current']:+.2f}  30d: {row['tone_baseline']:+.2f}  "
-              f"{int(row['n_current'])} haber)")
+              f"{int(row['n_current'])} " + ar("خبر") + ")")
 
     # ---------- 5) DIVERGING BAR CHART (TURKISH) ----------
     fig, ax = plt.subplots(figsize=(9, 8))
@@ -278,16 +278,16 @@ else:
     biggest_riser = top_risers.iloc[0]
     biggest_faller = top_fallers.iloc[-1]
     summary = (
-        f"En çok iyileşen: {biggest_riser['label']} ({biggest_riser['tone_delta']:+.2f}), "
-        f"en çok kötüleşen: {biggest_faller['label']} ({biggest_faller['tone_delta']:+.2f}). "
-        f"{total_qualified} coin'in 30 günlük bazlına göre değişimi."
+        f"{ar('الأكثر تحسناً')}: {biggest_riser['label']} ({biggest_riser['tone_delta']:+.2f}), "
+        f"{ar('الأكثر تراجعاً')}: {biggest_faller['label']} ({biggest_faller['tone_delta']:+.2f}). "
+        f"{total_qualified} " + ar("عملة — التغير مقارنة بمتوسط 30 يوم")
     )
     fig.text(0.5, 0.04, summary,
              ha="center", fontsize=7.5, color="#6B7280", style="italic")
 
     # Footer
     fig.text(0.5, 0.01,
-             far("هذا ليس نصيحة استثمارية."),
+             ar("هذا ليس نصيحة استثمارية."),
              ha="center", fontsize=7, color="#9CA3AF")
 
     plt.tight_layout(rect=[0, 0.04, 1, 1])

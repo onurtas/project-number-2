@@ -262,7 +262,7 @@ else:
         ha = "left" if tone >= 0 else "right"
         x_pos = tone + (0.1 if tone >= 0 else -0.1) + offset * (1 if tone >= 0 else -1)
         ax.text(x_pos, bar.get_y() + bar.get_height()/2,
-                f"{tone:+.2f}  ({n} haber)",
+                f"{tone:+.2f}  ({n} " + ar("خبر") + ")",
                 ha=ha, va="center", fontsize=9, fontweight="bold", color="#374151")
 
     # Y-axis: coin names
@@ -314,7 +314,7 @@ else:
 
     # Footer
     fig.text(0.5, 0.01,
-             far("هذا ليس نصيحة استثمارية."),
+             ar("هذا ليس نصيحة استثمارية."),
              ha="center", fontsize=7, color="#9CA3AF")
 
     plt.tight_layout(rect=[0, 0.04, 1, 1])

@@ -270,7 +270,7 @@ ax1.spines["left"].set_visible(False)
 ax1.tick_params(left=False)
 ax1.xaxis.grid(True, alpha=0.15, color="#9CA3AF")
 
-ax1.set_title("Büyük Kripto Piyasaları — Yayınlanan Haber Sayısı ve Ortalama Duygu",
+ax1.set_title(ar("الأسواق الكبرى — عدد الأخبار ومتوسط النبرة"),
               fontsize=14, fontweight="bold", color="#111827", pad=20)
 
 window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}sa pencere)"
@@ -279,14 +279,14 @@ ax1.text(0.5, 1.02, window_label,
 
 # Legend
 legend_elements = [
-    Patch(facecolor="#22C55E", label="Yükseliş (+3 üzeri)"),
-    Patch(facecolor="#34D399", label="Hafif Yükseliş (+1 / +3)"),
-    Patch(facecolor="#FBBF24", label="Nötr (-1 / +1)"),
-    Patch(facecolor="#F97316", label="Hafif Düşüş (-3 / -1)"),
-    Patch(facecolor="#EF4444", label="Düşüş (-3 altı)"),
+    Patch(facecolor="#22C55E", label=ar("صعود (+3 فما فوق)")),
+    Patch(facecolor="#34D399", label=ar("صعود طفيف (+1 / +3)")),
+    Patch(facecolor="#FBBF24", label=ar("محايد (-1 / +1)")),
+    Patch(facecolor="#F97316", label=ar("هبوط طفيف (-3 / -1)")),
+    Patch(facecolor="#EF4444", label=ar("هبوط (-3 فما دون)")),
 ]
 ax1.legend(handles=legend_elements, loc="lower right", fontsize=6.5,
-           title="Renk = Ortalama Ton", title_fontsize=7.5,
+           title=ar("اللون = متوسط النبرة"), title_fontsize=7.5,
            framealpha=0.9, edgecolor="#D1D5DB")
 
 # ===================== VIEW 2: Dynamic Top 10 =====================
@@ -325,7 +325,7 @@ else:
 
 # Footer
 fig.text(0.5, 0.01,
-         far("هذا ليس نصيحة استثمارية."),
+         ar("هذا ليس نصيحة استثمارية."),
          ha="center", fontsize=7, color="#9CA3AF")
 
 plt.tight_layout(rect=[0, 0.03, 1, 1])
@@ -367,7 +367,7 @@ tweet = (
 )
 for _, row in df_fixed_sorted.head(10).iterrows():
     n = int(row["n_articles"])
-    line = f"  {row['country_tr']}: {n} haber ({fv(row['avg_tone'])})\n"
+    line = f"  {row['country_tr']}: {n} خبر ({fv(row['avg_tone'])})\n"
     if len(tweet) + len(line) + 60 > 280:
         break
     tweet += line

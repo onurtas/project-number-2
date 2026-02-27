@@ -314,9 +314,9 @@ def draw_speedometer(ax, value, avg_30d, avg_6m, scope_label, n_articles, window
             ax.plot([x1, x2], [y1, y2], color="#9CA3AF", linewidth=0.7)
 
     # --- Edge labels ---
-    ax.text(center_x - radius_outer - 0.02, center_y - 0.04, "Düşüş",
+    ax.text(center_x - radius_outer - 0.02, center_y - 0.04, ar("هبوط"),
             ha="center", va="top", fontsize=8, color="#DC2626", fontweight="bold")
-    ax.text(center_x + radius_outer + 0.02, center_y - 0.04, "Yükseliş",
+    ax.text(center_x + radius_outer + 0.02, center_y - 0.04, ar("صعود"),
             ha="center", va="top", fontsize=8, color="#16A34A", fontweight="bold")
 
     # --- 30d average marker (dark triangle) ---

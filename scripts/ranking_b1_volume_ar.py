@@ -267,28 +267,28 @@ ax.text(0.5, 1.02, window_label,
 # Legend for colors
 from matplotlib.patches import Patch
 legend_elements = [
-    Patch(facecolor="#22C55E", label="Yükseliş (+3 üzeri)"),
-    Patch(facecolor="#34D399", label="Hafif Yükseliş (+1 / +3)"),
-    Patch(facecolor="#FBBF24", label="Nötr (-1 / +1)"),
-    Patch(facecolor="#F97316", label="Hafif Düşüş (-3 / -1)"),
-    Patch(facecolor="#EF4444", label="Düşüş (-3 altı)"),
+    Patch(facecolor="#22C55E", label=ar("صعود (+3 فما فوق)")),
+    Patch(facecolor="#34D399", label=ar("صعود طفيف (+1 / +3)")),
+    Patch(facecolor="#FBBF24", label=ar("محايد (-1 / +1)")),
+    Patch(facecolor="#F97316", label=ar("هبوط طفيف (-3 / -1)")),
+    Patch(facecolor="#EF4444", label=ar("هبوط (-3 فما دون)")),
 ]
 ax.legend(handles=legend_elements, loc="lower right", fontsize=7,
-          title="Renk = Ortalama Ton", title_fontsize=8,
+          title=ar("اللون = متوسط النبرة"), title_fontsize=8,
           framealpha=0.9, edgecolor="#D1D5DB")
 
 # Auto-generated summary
 top1 = df.iloc[0]
 summary = (
-    f"{top1['label']} en çok haber alan coin oldu ({int(top1['n_articles'])} haber). "
-    f"Son {WINDOW_HOURS} saatte {total_coins_with_data} coin'de toplam {total_articles:,} haber yayınlandı."
+    f"{top1['label']}: {int(top1['n_articles'])} {ar('خبر')}. "
+    f"{total_coins_with_data} {ar('عملة')} | {total_articles:,} {ar('خبر إجمالي')}"
 )
 fig.text(0.5, 0.04, summary,
          ha="center", fontsize=7.5, color="#6B7280", style="italic")
 
 # Footer
 fig.text(0.5, 0.01,
-         far("هذا ليس نصيحة استثمارية."),
+         ar("هذا ليس نصيحة استثمارية."),
          ha="center", fontsize=7, color="#9CA3AF")
 
 plt.tight_layout(rect=[0, 0.04, 1, 1])
@@ -327,7 +327,7 @@ tweet = (
     f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}sa)\n\n"
 )
 for i, (_, row) in enumerate(df.head(TOP_N).iterrows(), 1):
-    line = f"{i}. {row['label']}: {int(row['n_articles'])} haber ({fv(row['avg_tone'])})\n"
+    line = f"{i}. {row['label']}: {int(row['n_articles'])} خبر ({fv(row['avg_tone'])})\n"
     if len(tweet) + len(line) + 60 > 280:
         break
     tweet += line
