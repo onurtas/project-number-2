@@ -368,7 +368,7 @@ else:
                     transform=ax.transAxes, ha="left", va="top",
                     fontsize=10, color="#111827", fontweight="bold")
 
-            ax.text(0.12, y - 0.035, f"{a['domain']}  •  {ar("المعنويات")}:{score:+d}/10",
+            ax.text(0.12, y - 0.035, f"{a['domain']}  •  {ar('المعنويات')}:{score:+d}/10",
                     transform=ax.transAxes, ha="left", va="top",
                     fontsize=8, color="#6B7280")
 
@@ -404,7 +404,7 @@ else:
                     transform=ax.transAxes, ha="left", va="top",
                     fontsize=10, color="#111827", fontweight="bold")
 
-            ax.text(0.12, y - 0.035, f"{a['domain']}  •  {ar("المعنويات")}:{score:+d}/10",
+            ax.text(0.12, y - 0.035, f"{a['domain']}  •  {ar('المعنويات')}:{score:+d}/10",
                     transform=ax.transAxes, ha="left", va="top",
                     fontsize=8, color="#6B7280")
 
