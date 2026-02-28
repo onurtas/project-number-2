@@ -1,4 +1,7 @@
 import os
+import sys
+sys.path.insert(0, os.path.dirname(__file__))
+from arabic_text_helper import ar
 # ============================================================
 # GDELT Crypto News — Aşırı Duygu Haberleri (Type D) v3
 # Colab-ready: GDELT DOC API + Claude Sonnet verification/translation
