@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 NOW_UTC = datetime.now(timezone.utc)  # production mode
 
 LOOKBACK_30D = 30
-LOOKBACK_6M = 180
+LOOKBACK_6M = 90
 MIN_ARTICLES_TOTAL = 50
 MIN_ARTICLES_PER_KW = 5
 
@@ -408,7 +408,7 @@ def draw_speedometer(ax, value, avg_30d, avg_6m, scope_label, n_articles, window
     # 6-month average
     avg6m_str = f"{avg_6m:+.2f}" if avg_6m is not None else "N/A"
     ax.text(center_x, center_y - 0.27,
-            ar("متوسط 6 أشهر") + f": {avg6m_str}",
+            ar("متوسط 3 أشهر") + f": {avg6m_str}",
             ha="center", va="center", fontsize=9, color="#6B7280")
 
     # Article count
@@ -505,9 +505,9 @@ def format_tweet(gauge_global, gauge_us, window_end):
         f"مؤشر معنويات العملات الرقمية\n"
         f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC\n\n"
         f"عالمي: {fv(g['current'])} ({tone_label(g['current'])}) {arrow(g['current'], g['avg_30d'])}\n"
-        f"  30ي: {fv(g['avg_30d'])} | 6ش: {fv(g['avg_6m'])} | {g['n_articles_current']:,} خبر\n\n"
+        f"  30ي: {fv(g['avg_30d'])} | 3ش: {fv(g['avg_6m'])} | {g['n_articles_current']:,} خبر\n\n"
         f"أمريكا: {fv(u['current'])} ({tone_label(u['current'])}) {arrow(u['current'], u['avg_30d'])}\n"
-        f"  30ي: {fv(u['avg_30d'])} | 6ش: {fv(u['avg_6m'])} | {u['n_articles_current']:,} خبر\n\n"
+        f"  30ي: {fv(u['avg_30d'])} | 3ش: {fv(u['avg_6m'])} | {u['n_articles_current']:,} خبر\n\n"
         f"ليس نصيحة استثمارية.\n"
         f"#كريبتو #بيتكوين"
     )

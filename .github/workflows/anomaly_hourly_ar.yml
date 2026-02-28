@@ -2,7 +2,7 @@ name: "Hourly — Anomaly Alerts AR (Type C)"
 
 on:
   schedule:
-    - cron: '30 */3 * * *'  # every 3 hours at :30
+    - cron: '30 */6 * * *'  # every 6 hours at :30
   workflow_dispatch:
 
 permissions:

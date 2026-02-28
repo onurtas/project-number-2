@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 NOW_UTC = datetime.now(timezone.utc)  # production mode
 
 LOOKBACK_30D = 30
-LOOKBACK_6M = 180
+LOOKBACK_6M = 90
 MIN_ARTICLES_TOTAL = 50
 MIN_ARTICLES_PER_KW = 5
 
@@ -407,7 +407,7 @@ def draw_speedometer(ax, value, avg_30d, avg_6m, scope_label, n_articles, window
     # 6-month average
     avg6m_str = f"{avg_6m:+.2f}" if avg_6m is not None else "N/A"
     ax.text(center_x, center_y - 0.27,
-            f"6 aylık ortalama: {avg6m_str}",
+            f"3 aylık ortalama: {avg6m_str}",
             ha="center", va="center", fontsize=9, color="#6B7280")
 
     # Article count
@@ -516,9 +516,9 @@ def format_tweet(gauge_global, gauge_us, window_end):
         f"Kripto Duygu Göstergesi\n"
         f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC\n\n"
         f"DÜNYA: {fv(g['current'])} ({tone_label(g['current'])}) {arrow(g['current'], g['avg_30d'])}\n"
-        f"  30g: {fv(g['avg_30d'])} | 6a: {fv(g['avg_6m'])} | {g['n_articles_current']:,} haber\n\n"
+        f"  30g: {fv(g['avg_30d'])} | 3a: {fv(g['avg_6m'])} | {g['n_articles_current']:,} haber\n\n"
         f"ABD: {fv(u['current'])} ({tone_label(u['current'])}) {arrow(u['current'], u['avg_30d'])}\n"
-        f"  30g: {fv(u['avg_30d'])} | 6a: {fv(u['avg_6m'])} | {u['n_articles_current']:,} haber\n\n"
+        f"  30g: {fv(u['avg_30d'])} | 3a: {fv(u['avg_6m'])} | {u['n_articles_current']:,} haber\n\n"
         f"Yatırım tavsiyesi değildir.\n"
         f"#KriptoDuygu #Bitcoin #Ethereum"
     )
