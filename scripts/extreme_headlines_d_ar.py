@@ -555,7 +555,7 @@ print(f"Saved: {tweet_path}")
 # ---------- 10) SAVE POST METADATA ----------
 post_meta = {
     "tweet_text": tweet_main,
-    "png_path": str(png_path),
+    "png_path": str(png_path) if 'png_path' in dir() else "",
     "reply_tweets": reply_tweets,
 }
 post_path = OUTDIR / f"extreme_headlines_ar_{tag}_post.json"
