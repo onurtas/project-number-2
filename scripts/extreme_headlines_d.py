@@ -196,10 +196,16 @@ PASS if about:
 REJECT if:
 - NOT actually about crypto (matched search terms accidentally)
 - Primarily about traditional finance with only a passing crypto mention
-- About non-crypto politics, elections, campaigns
+- About non-crypto politics, elections, campaigns, government policy unrelated to crypto
 - Violence, crime stories unrelated to crypto
 - Celebrity gossip, sports, weather, entertainment
 - Clickbait with no real crypto substance
+- Sanctions, DOJ actions, court proceedings, or legal cases against specific countries, governments, or political figures (even if crypto is mentioned)
+- Terrorism, extremism, or terrorism financing stories
+- Religious, ethnic, or racially sensitive content
+- War, military operations, or geopolitical conflicts (even if crypto is tangentially mentioned)
+- Money laundering or criminal investigations focused on individuals/organizations rather than crypto market impact
+- Kidnapping, ransom, or personal crime stories involving crypto
 
 TASK 2 — SCORE: For verified headlines, assign a sentiment score from -10 (extremely negative for crypto) to +10 (extremely positive for crypto). Consider the crypto market impact, not general tone.
 
