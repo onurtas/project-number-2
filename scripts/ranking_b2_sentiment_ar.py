@@ -45,6 +45,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from auth_helper import get_bq_client, PROJECT_ID, REGION
 import pathlib
 from arabic_text_helper import ar
+from google.api_core.exceptions import NotFound
 
 # PROJECT_ID from auth_helper
 # REGION from auth_helper
@@ -63,19 +64,27 @@ except Exception:
     ds.location = REGION
     client.create_dataset(ds)
 
-lookup_url = "https://blog.gdeltproject.org/wp-content/uploads/2021-news-outlets-by-countrycode-2015-2021.csv"
-lookup = pd.read_csv(lookup_url)
-lookup_top = (
-    lookup.sort_values(["domain", "cnt"], ascending=[True, False])
-          .groupby("domain", as_index=False)
-          .first()
-)
-job = client.load_table_from_dataframe(
-    lookup_top, LOOKUP_FQN,
-    job_config=bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE"),
-)
-job.result()
-print(f"Uploaded lookup: {LOOKUP_FQN} ({len(lookup_top)} rows)")
+# The domain-to-country lookup is STATIC. Build the table only if it does not already
+# exist; otherwise reuse it. This avoids re-downloading the CSV from blog.gdeltproject.org
+# on every run (that host's expired TLS cert caused the outage) and skips a redundant reload.
+try:
+    client.get_table(LOOKUP_FQN)
+    print(f"Lookup table exists, reusing: {LOOKUP_FQN}")
+except NotFound:
+    print("Lookup table missing - building from source CSV...")
+    lookup_url = "https://blog.gdeltproject.org/wp-content/uploads/2021-news-outlets-by-countrycode-2015-2021.csv"
+    lookup = pd.read_csv(lookup_url)
+    lookup_top = (
+        lookup.sort_values(["domain", "cnt"], ascending=[True, False])
+        .groupby("domain", as_index=False)
+        .first()
+    )
+    job = client.load_table_from_dataframe(
+        lookup_top, LOOKUP_FQN,
+        job_config=bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE"),
+    )
+    job.result()
+    print(f"Uploaded lookup: {LOOKUP_FQN} ({len(lookup_top)} rows)")
 
 # ---------- 3) 50-COIN KEYWORD LIST ----------
 RANKING_COINS = [
