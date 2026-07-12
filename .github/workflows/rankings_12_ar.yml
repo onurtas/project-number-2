@@ -1,8 +1,13 @@
-name: "15:00 — Coin Rankings AR (Type B)"
+name: "12:00 — Coin Rankings AR (B1/B3 only; B2 unified into TR workflow)"
+
+# Moved from 15:00 to 12:00 (2026-07-12) so AR and TR rankings post at the
+# same time. On B2 days this workflow does nothing: the unified
+# ranking_b2_sentiment.py in the TR 12:00 workflow computes once and posts
+# identical-data TR + AR posts. B1/B3 AR still run here (own compute).
 
 on:
   schedule:
-    - cron: '0 15 * * *'
+    - cron: '0 12 * * *'
   workflow_dispatch:
 
 jobs:
@@ -16,7 +21,9 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install arabic-reshaper python-bidi
 
       - name: Determine which ranking to run (B1→B2→B3 rotation)
         id: pick
@@ -27,8 +34,8 @@ jobs:
             echo "script=scripts/ranking_b1_volume_ar.py" >> $GITHUB_OUTPUT
             echo "name=B1-Volume-AR" >> $GITHUB_OUTPUT
           elif [ $MOD -eq 1 ]; then
-            echo "script=scripts/ranking_b2_sentiment_ar.py" >> $GITHUB_OUTPUT
-            echo "name=B2-Sentiment-AR" >> $GITHUB_OUTPUT
+            echo "script=SKIP" >> $GITHUB_OUTPUT
+            echo "name=B2-unified-skip" >> $GITHUB_OUTPUT
           else
             echo "script=scripts/ranking_b3_movers_ar.py" >> $GITHUB_OUTPUT
             echo "name=B3-Movers-AR" >> $GITHUB_OUTPUT
@@ -38,7 +45,12 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
-        run: python ${{ steps.pick.outputs.script }}
+        run: |
+          if [ "${{ steps.pick.outputs.script }}" = "SKIP" ]; then
+            echo "B2 day: AR post is produced by the unified TR 12:00 workflow. Nothing to run."
+          else
+            python ${{ steps.pick.outputs.script }}
+          fi
 
       - name: Post to X (Arabic)
         env:
