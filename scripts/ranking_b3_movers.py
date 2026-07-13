@@ -1,13 +1,21 @@
 # ============================================================
-# GDELT Crypto News — Coin Rankings B3: En Büyük Değişimler (Movers)
-# Colab-ready: 50-coin query + Diverging bar chart
+# GDELT Crypto News — Coin Rankings B3: Movers (UNIFIED TR + AR)
 #
-# B3 = Tonu en çok değişen 10 kripto para (Dünya)
+# B3 = Coins with the biggest tone CHANGE (delta), Global scope
 # 6-hour window vs 30-day baseline
-# Shows tone CHANGE (delta), not absolute tone
-# 6-field expanded search, Global scope
 # Min 5 articles in 6h, min 20 in baseline to qualify
-# Turkish UI
+#
+# UNIFIED 2026-07-13: one compute -> two identical-data posts (TR + AR).
+#   - Query runs ONCE; TR and AR charts/tweets rendered from the same data.
+#   - Sign sanity: risers list only tone_delta > 0, fallers only < 0.
+#     A coin can never appear in both lists (fixes the head/tail defect).
+#   - Minimum-post gate: fewer than MIN_COINS_TO_POST coins after the
+#     sign filter -> skip the post entirely (no broken quiet-day posts).
+#   - Figure height scales with bar count (no one-bar balloon).
+#   - All Arabic chart strings pass through ar() (arabic_text_helper).
+#   - Replaces ranking_b3_movers_ar.py (now inert; no workflow calls it).
+#     AR posting is handled by the 12:00 rankings workflow's AR post step.
+#
 # Project: gdelt-research-470509
 # ============================================================
 
@@ -19,40 +27,25 @@ NOW_UTC = datetime.now(timezone.utc)  # production mode
 
 WINDOW_HOURS = 6
 LOOKBACK_DAYS = 30
-TOP_N = 5          # top 5 risers + top 5 fallers = 10 shown
+TOP_N = 5                   # up to 5 risers + up to 5 fallers shown
 MIN_ARTICLES_CURRENT = 5    # min in 6h window
 MIN_ARTICLES_BASELINE = 20  # min in 30d baseline
-
-window_start = NOW_UTC - timedelta(hours=WINDOW_HOURS)
-window_end = NOW_UTC
-baseline_start = NOW_UTC - timedelta(days=LOOKBACK_DAYS)
-baseline_end = window_start  # baseline ends where current window starts
-
-partition_start = baseline_start.strftime("%Y-%m-%d")
-partition_end = window_end.strftime("%Y-%m-%d")
-window_start_ts = window_start.strftime("%Y%m%d%H%M%S")
-window_end_ts = window_end.strftime("%Y%m%d%H%M%S")
-baseline_start_ts = baseline_start.strftime("%Y%m%d%H%M%S")
-baseline_end_ts = baseline_end.strftime("%Y%m%d%H%M%S")
-
-print(f"Current window:   {window_start.isoformat()} -> {window_end.isoformat()}")
-print(f"Baseline:         {baseline_start.isoformat()} -> {baseline_end.isoformat()}")
-print(f"Partitions:       {partition_start} -> {partition_end}")
+MIN_COINS_TO_POST = 3       # fewer sign-filtered coins -> skip posting
 
 # ---------- 1) SETUP ----------
-
-
-
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from google.cloud import bigquery
-import sys, os
+import sys, os, json
 sys.path.insert(0, os.path.dirname(__file__))
 from auth_helper import get_bq_client, PROJECT_ID, REGION
 import pathlib
+from arabic_text_helper import ar
 
-client = get_bq_client()
+OUTDIR = pathlib.Path("gdelt_bq_results")
 
 # ---------- 2) 50-COIN KEYWORD LIST ----------
 RANKING_COINS = [
@@ -110,20 +103,71 @@ RANKING_COINS = [
     {"label": "Quant",             "pattern": r"\bquant\b",             "needs_context": True},
 ]
 
-# ---------- 3) BUILD BIGQUERY (GLOBAL, CURRENT + BASELINE) ----------
-safe_coins = [c for c in RANKING_COINS if not c["needs_context"]]
-ambig_coins = [c for c in RANKING_COINS if c["needs_context"]]
+# ---------- LANGUAGE PACKS (all AR strings pass through ar() at render time) ----------
+LANGS = {
+    "tr": {
+        "suffix": "",
+        "title": "En Büyük Duygu Değişimleri",
+        "xlabel": "Ton Değişimi (6sa vs 30 gün)",
+        "window_word": "sa vs 30 gün",
+        "neg_annot": "← Kötüleşen",
+        "pos_annot": "İyileşen →",
+        "summary": "En çok iyileşen: {pos}, en çok kötüleşen: {neg}. {n} coin'in 30 günlük bazlına göre değişimi.",
+        "summary_pos_only": "En çok iyileşen: {pos}. {n} coin'in 30 günlük bazlına göre değişimi.",
+        "summary_neg_only": "En çok kötüleşen: {neg}. {n} coin'in 30 günlük bazlına göre değişimi.",
+        "footer": "Yatırım tavsiyesi değildir.",
+        "tweet_title": "En Buyuk Duygu Degisimleri",
+        "tweet_window": "sa vs 30g",
+        "tweet_pos_header": "En Cok Iyilesen:",
+        "tweet_neg_header": "En Cok Kotulesen:",
+        "tweet_footer": "Yatirim tavsiyesi degildir.",
+        "hashtags": "#KriptoDuygu #Bitcoin",
+        "rtl": False,
+    },
+    "ar": {
+        "suffix": "_ar",
+        "title": "أكبر تغيرات المعنويات",
+        "xlabel": "تغير النبرة (6 ساعات مقابل 30 يوم)",
+        "window_word": "h vs 30d",
+        "neg_annot_ar_word": "تراجع",   # rendered as ar("تراجع") + " ←"
+        "pos_annot_ar_word": "تحسن",    # rendered as "→ " + ar("تحسن")
+        "summary": "الأكثر تحسناً: {pos}، الأكثر تراجعاً: {neg}. التغير مقارنة بمتوسط 30 يوماً لـ {n} عملة.",
+        "summary_pos_only": "الأكثر تحسناً: {pos}. التغير مقارنة بمتوسط 30 يوماً لـ {n} عملة.",
+        "summary_neg_only": "الأكثر تراجعاً: {neg}. التغير مقارنة بمتوسط 30 يوماً لـ {n} عملة.",
+        "footer": "هذا ليس نصيحة استثمارية.",
+        "tweet_title": "أكبر تغيرات المعنويات",
+        "tweet_window": "h vs 30d",
+        "tweet_pos_header": "الأكثر تحسناً:",
+        "tweet_neg_header": "الأكثر تراجعاً:",
+        "tweet_footer": "ليس نصيحة استثمارية.",
+        "hashtags": "#كريبتو #بيتكوين",
+        "rtl": True,
+    },
+}
 
-safe_kw_sql = ",\n    ".join(
-    [f"STRUCT('{c['label']}' AS label, r\"{c['pattern']}\" AS pattern)"
-     for c in safe_coins]
-)
-ambig_kw_sql = ",\n    ".join(
-    [f"STRUCT('{c['label']}' AS label, r\"{c['pattern']}\" AS pattern)"
-     for c in ambig_coins]
-)
 
-sql = f"""
+# ---------- QUERY ----------
+def build_sql(window_start, window_end, baseline_start, baseline_end):
+    partition_start = baseline_start.strftime("%Y-%m-%d")
+    partition_end = window_end.strftime("%Y-%m-%d")
+    window_start_ts = window_start.strftime("%Y%m%d%H%M%S")
+    window_end_ts = window_end.strftime("%Y%m%d%H%M%S")
+    baseline_start_ts = baseline_start.strftime("%Y%m%d%H%M%S")
+    baseline_end_ts = baseline_end.strftime("%Y%m%d%H%M%S")
+
+    safe_coins = [c for c in RANKING_COINS if not c["needs_context"]]
+    ambig_coins = [c for c in RANKING_COINS if c["needs_context"]]
+
+    safe_kw_sql = ",\n    ".join(
+        [f"STRUCT('{c['label']}' AS label, r\"{c['pattern']}\" AS pattern)"
+         for c in safe_coins]
+    )
+    ambig_kw_sql = ",\n    ".join(
+        [f"STRUCT('{c['label']}' AS label, r\"{c['pattern']}\" AS pattern)"
+         for c in ambig_coins]
+    )
+
+    return f"""
 WITH g AS (
   SELECT
     SUBSTR(GKGRECORDID, 1, 14) AS record_ts,
@@ -172,143 +216,217 @@ GROUP BY label
 ORDER BY label
 """
 
-print(f"Running BigQuery for {len(RANKING_COINS)} coins (6h + 30d baseline)...")
-df = client.query(sql, location=REGION).to_dataframe()
-print(f"\nAll coins: {len(df)}")
-print(df.to_string(index=False))
 
-# ---------- 4) COMPUTE DELTA + FILTER ----------
-df["tone_delta"] = df["tone_current"] - df["tone_baseline"]
+# ---------- SELECTION (sign sanity + dedup by construction) ----------
+def select_lists(df):
+    """Return (df_qualified, top_risers, top_fallers, df_show).
+    Risers: tone_delta > 0 only, biggest improvement first. Fallers:
+    tone_delta < 0 only, biggest decline first. Lists are disjoint by
+    construction; coins with delta exactly 0 are in neither."""
+    df = df.copy()
+    df["tone_delta"] = df["tone_current"] - df["tone_baseline"]
+    df_qualified = df[
+        (df["n_current"] >= MIN_ARTICLES_CURRENT) &
+        (df["n_baseline"] >= MIN_ARTICLES_BASELINE)
+    ].copy()
+    top_risers = (df_qualified[df_qualified["tone_delta"] > 0]
+                  .sort_values("tone_delta", ascending=False)
+                  .head(TOP_N).copy())
+    top_fallers = (df_qualified[df_qualified["tone_delta"] < 0]
+                   .sort_values("tone_delta", ascending=True)
+                   .head(TOP_N).copy())
+    df_show = (pd.concat([top_risers, top_fallers])
+               .sort_values("tone_delta", ascending=True))
+    return df_qualified, top_risers, top_fallers, df_show
 
-# Filter: need enough articles in both windows
-df_qualified = df[
-    (df["n_current"] >= MIN_ARTICLES_CURRENT) &
-    (df["n_baseline"] >= MIN_ARTICLES_BASELINE)
-].copy()
 
-print(f"\nQualified (>={MIN_ARTICLES_CURRENT} current, >={MIN_ARTICLES_BASELINE} baseline): {len(df_qualified)}")
+# ---------- CHART ----------
+def render_chart(lang, L, df_show, top_risers, top_fallers,
+                 window_start, window_end, tag, total_qualified):
+    n = len(df_show)
+    is_ar = L["rtl"]
 
-if len(df_qualified) == 0:
-    print("WARNING: No coins qualified. Try lowering thresholds.")
-else:
-    # Sort by absolute delta to find biggest movers
-    df_qualified = df_qualified.sort_values("tone_delta", ascending=False)
+    def T(s):
+        return ar(s) if is_ar else s
 
-    # Top 5 risers (most improved tone) + Top 5 fallers (most worsened)
-    top_risers = df_qualified.head(TOP_N).copy()
-    top_fallers = df_qualified.tail(TOP_N).copy()
+    fig_h = max(3.2, 1.8 + 0.72 * n)
+    fig, ax = plt.subplots(figsize=(9, fig_h))
 
-    # Combine for display
-    df_show = pd.concat([top_risers, top_fallers]).drop_duplicates(subset="label")
-    df_show = df_show.sort_values("tone_delta", ascending=True)
-
-    total_articles = int(df["n_current"].sum())
-    total_qualified = len(df_qualified)
-
-    print(f"\nBiggest movers ({len(df_show)} coins):")
-    for _, row in df_show.iterrows():
-        print(f"  {row['label']:20s}  delta: {row['tone_delta']:+.2f}  "
-              f"(now: {row['tone_current']:+.2f}  30d: {row['tone_baseline']:+.2f}  "
-              f"{int(row['n_current'])} haber)")
-
-    # ---------- 5) DIVERGING BAR CHART (TURKISH) ----------
-    fig, ax = plt.subplots(figsize=(9, 8))
-
-    y_pos = range(len(df_show))
+    y_pos = range(n)
     deltas = df_show["tone_delta"].values
 
-    # Color: green for improvement, red for decline
-    colors = ["#22C55E" if d >= 0 else "#EF4444" for d in deltas]
+    colors = ["#22C55E" if d > 0 else "#EF4444" for d in deltas]
+    bars = ax.barh(y_pos, deltas, color=colors, height=0.6,
+                   edgecolor="white", linewidth=0.5)
 
-    bars = ax.barh(y_pos, deltas, color=colors, height=0.6, edgecolor="white", linewidth=0.5)
-
-    # Labels at end of each bar
     for bar, (_, row) in zip(bars, df_show.iterrows()):
         delta = row["tone_delta"]
-        n = int(row["n_current"])
         current = row["tone_current"]
         baseline = row["tone_baseline"]
-
-        # Delta + detail at end of bar
         offset = 0.08 if abs(delta) < 0.3 else 0
         ha = "left" if delta >= 0 else "right"
         x_pos = delta + (0.05 if delta >= 0 else -0.05) + offset * (1 if delta >= 0 else -1)
-        ax.text(x_pos, bar.get_y() + bar.get_height()/2,
+        ax.text(x_pos, bar.get_y() + bar.get_height() / 2,
                 f"{delta:+.2f}  ({current:+.1f} ← {baseline:+.1f})",
                 ha=ha, va="center", fontsize=8.5, fontweight="bold", color="#374151")
 
-    # Y-axis
-    ax.set_yticks(y_pos)
+    ax.set_yticks(list(y_pos))
     ax.set_yticklabels(df_show["label"], fontsize=11, fontweight="bold", color="#111827")
 
-    # Zero line
     ax.axvline(x=0, color="#374151", linewidth=1, zorder=3)
+    ax.set_xlabel(T(L["xlabel"]), fontsize=11, color="#4B5563", fontweight="bold")
 
-    # X-axis
-    ax.set_xlabel("Ton Değişimi (6sa vs 30 gün)", fontsize=11, color="#4B5563", fontweight="bold")
-
-    # Symmetric x-axis
     max_abs = max(abs(deltas.min()), abs(deltas.max()), 1) * 1.4
     ax.set_xlim(-max_abs, max_abs)
 
-    # Clean up
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.spines["left"].set_visible(False)
     ax.tick_params(left=False)
     ax.xaxis.grid(True, alpha=0.15, color="#9CA3AF")
 
-    # Title
-    ax.set_title("En Büyük Duygu Değişimleri",
-                 fontsize=17, fontweight="bold", color="#111827", pad=20)
+    ax.set_title(T(L["title"]), fontsize=17, fontweight="bold",
+                 color="#111827", pad=20)
 
-    # Subtitle
-    window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}sa vs 30 gün)"
-    ax.text(0.5, 1.02, window_label,
-            transform=ax.transAxes, ha="center", fontsize=10, color="#6B7280")
+    window_label = (f"{window_start.strftime('%d.%m.%Y %H:%M')} – "
+                    f"{window_end.strftime('%H:%M')} UTC  "
+                    f"({WINDOW_HOURS}{L['window_word']})")
+    ax.text(0.5, 1.02, window_label, transform=ax.transAxes,
+            ha="center", fontsize=10, color="#6B7280")
 
-    # Direction annotations
-    ax.text(-max_abs * 0.95, len(df_show) + 0.3, "← Kötüleşen",
+    if is_ar:
+        neg_txt = ar(L["neg_annot_ar_word"]) + " ←"
+        pos_txt = "→ " + ar(L["pos_annot_ar_word"])
+    else:
+        neg_txt = L["neg_annot"]
+        pos_txt = L["pos_annot"]
+    ax.text(-max_abs * 0.95, n - 0.25 + 0.55, neg_txt,
             ha="left", fontsize=9, color="#DC2626", fontweight="bold")
-    ax.text(max_abs * 0.95, len(df_show) + 0.3, "İyileşen →",
+    ax.text(max_abs * 0.95, n - 0.25 + 0.55, pos_txt,
             ha="right", fontsize=9, color="#16A34A", fontweight="bold")
+    ax.set_ylim(-0.6, n - 0.4 + 1.0)  # constant slot size + header room
 
-    # Auto-generated summary
-    biggest_riser = top_risers.iloc[0]
-    biggest_faller = top_fallers.iloc[-1]
-    summary = (
-        f"En çok iyileşen: {biggest_riser['label']} ({biggest_riser['tone_delta']:+.2f}), "
-        f"en çok kötüleşen: {biggest_faller['label']} ({biggest_faller['tone_delta']:+.2f}). "
-        f"{total_qualified} coin'in 30 günlük bazlına göre değişimi."
-    )
-    fig.text(0.5, 0.04, summary,
-             ha="center", fontsize=7.5, color="#6B7280", style="italic")
+    # Summary line (handles one-sided days)
+    if len(top_risers) and len(top_fallers):
+        br = top_risers.iloc[0]
+        bf = top_fallers.iloc[0]
+        summary = L["summary"].format(
+            pos=f"{br['label']} ({br['tone_delta']:+.2f})",
+            neg=f"{bf['label']} ({bf['tone_delta']:+.2f})", n=total_qualified)
+    elif len(top_risers):
+        br = top_risers.iloc[0]
+        summary = L["summary_pos_only"].format(
+            pos=f"{br['label']} ({br['tone_delta']:+.2f})", n=total_qualified)
+    else:
+        bf = top_fallers.iloc[0]
+        summary = L["summary_neg_only"].format(
+            neg=f"{bf['label']} ({bf['tone_delta']:+.2f})", n=total_qualified)
+    # NOTE: no italic for Arabic — DejaVu Sans Oblique has no Arabic glyphs.
+    fig.text(0.5, 0.04, T(summary), ha="center", fontsize=7.5,
+             color="#6B7280", style=("normal" if is_ar else "italic"))
 
-    # Footer
-    fig.text(0.5, 0.01,
-             f"Yatırım tavsiyesi değildir.",
-             ha="center", fontsize=7, color="#9CA3AF")
+    fig.text(0.5, 0.01, T(L["footer"]), ha="center", fontsize=7, color="#9CA3AF")
 
     plt.tight_layout(rect=[0, 0.04, 1, 1])
 
-    # Save
-    OUTDIR = pathlib.Path("gdelt_bq_results"); OUTDIR.mkdir(exist_ok=True)
-    tag = window_end.strftime("%Y%m%d_%H%M")
-    png_path = OUTDIR / f"ranking_b3_movers_{tag}.png"
+    OUTDIR.mkdir(exist_ok=True)
+    png_path = OUTDIR / f"ranking_b3_movers{L['suffix']}_{tag}.png"
     plt.savefig(png_path, dpi=200, bbox_inches="tight", facecolor="white")
-    plt.close()  # no display in CI
-    print(f"\nSaved: {png_path}")
+    plt.close()
+    print(f"Saved: {png_path}")
+    return png_path
 
-    # ---------- 6) SAVE JSON ----------
-    import json
+
+# ---------- TWEET ----------
+def build_tweet(L, top_risers, top_fallers, window_end):
+    def fv(v):
+        return f"{v:+.2f}" if pd.notna(v) else "N/A"
+
+    tweet = (
+        f"{L['tweet_title']}\n"
+        f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC "
+        f"({WINDOW_HOURS}{L['tweet_window']})\n"
+    )
+
+    if len(top_risers):
+        tweet += f"\n{L['tweet_pos_header']}\n"
+        for i, (_, row) in enumerate(top_risers.iterrows(), 1):
+            line = f"  {i}. {row['label']}: {fv(row['tone_delta'])}\n"
+            if len(tweet) + len(line) + 80 > 280:
+                break
+            tweet += line
+
+    if len(top_fallers):
+        neg_header = f"\n{L['tweet_neg_header']}\n"
+        if len(tweet) + len(neg_header) + 60 < 280:
+            tweet += neg_header
+            for i, (_, row) in enumerate(top_fallers.iterrows(), 1):
+                line = f"  {i}. {row['label']}: {fv(row['tone_delta'])}\n"
+                if len(tweet) + len(line) + 60 > 280:
+                    break
+                tweet += line
+
+    tweet += f"\n{L['tweet_footer']}\n{L['hashtags']}"
+
+    if len(tweet) > 280:
+        tweet = tweet[:277] + "..."
+    return tweet
+
+
+# ---------- MAIN ----------
+def main():
+    window_start = NOW_UTC - timedelta(hours=WINDOW_HOURS)
+    window_end = NOW_UTC
+    baseline_start = NOW_UTC - timedelta(days=LOOKBACK_DAYS)
+    baseline_end = window_start  # baseline ends where current window starts
+    tag = window_end.strftime("%Y%m%d_%H%M")
+
+    print(f"Current window:   {window_start.isoformat()} -> {window_end.isoformat()}")
+    print(f"Baseline:         {baseline_start.isoformat()} -> {baseline_end.isoformat()}")
+
+    # Diagnostic: confirm Arabic shaping is actually active in this environment.
+    _probe = "خبر"
+    print(f"Arabic shaping active: {ar(_probe) != _probe}")
+
+    client = get_bq_client()
+    sql = build_sql(window_start, window_end, baseline_start, baseline_end)
+    print(f"Running BigQuery for {len(RANKING_COINS)} coins (6h + 30d baseline)...")
+    df = client.query(sql, location=REGION).to_dataframe()
+    print(f"\nAll coins: {len(df)}")
+    print(df.to_string(index=False))
+
+    df_qualified, top_risers, top_fallers, df_show = select_lists(df)
+    print(f"\nQualified (>={MIN_ARTICLES_CURRENT} current, "
+          f">={MIN_ARTICLES_BASELINE} baseline): {len(df_qualified)}")
+    print(f"After sign filter: {len(top_risers)} risers, {len(top_fallers)} fallers")
+
+    # ---------- MINIMUM-POST GATE ----------
+    if len(df_show) < MIN_COINS_TO_POST:
+        print(f"\nGATE: only {len(df_show)} sign-filtered coins "
+              f"(< {MIN_COINS_TO_POST}). Quiet news window - skipping post.")
+        print("No chart, no post JSON written. Exiting cleanly.")
+        return
+
+    total_qualified = len(df_qualified)
+    print(f"\nBiggest movers ({len(df_show)} coins):")
+    for _, row in df_show.iterrows():
+        print(f"  {row['label']:20s}  delta: {row['tone_delta']:+.2f}  "
+              f"(now: {row['tone_current']:+.2f}  30d: {row['tone_baseline']:+.2f}  "
+              f"{int(row['n_current'])} art)")
+
+    OUTDIR.mkdir(exist_ok=True)
+
+    # ---------- SHARED DATA JSON (one compute, both languages) ----------
     ranking_data = {
         "type": "B3_movers",
+        "unified_languages": ["tr", "ar"],
         "timestamp": window_end.isoformat(),
         "window_hours": WINDOW_HOURS,
         "baseline_days": LOOKBACK_DAYS,
         "scope": "GLOBAL",
         "min_articles_current": MIN_ARTICLES_CURRENT,
         "min_articles_baseline": MIN_ARTICLES_BASELINE,
+        "min_coins_to_post": MIN_COINS_TO_POST,
         "total_coins_qualified": total_qualified,
         "top_risers": top_risers.to_dict(orient="records"),
         "top_fallers": top_fallers.to_dict(orient="records"),
@@ -319,49 +437,28 @@ else:
         json.dump(ranking_data, f, indent=2, default=str)
     print(f"Saved: {json_path}")
 
-    # ---------- 7) TWEET TEXT ----------
-    def fv(v): return f"{v:+.2f}" if pd.notna(v) else "N/A"
+    # ---------- RENDER + POST METADATA, BOTH LANGUAGES ----------
+    for lang in ("tr", "ar"):
+        L = LANGS[lang]
+        png_path = render_chart(lang, L, df_show, top_risers, top_fallers,
+                                window_start, window_end, tag, total_qualified)
+        tweet = build_tweet(L, top_risers, top_fallers, window_end)
 
-    tweet = (
-        f"En Buyuk Duygu Degisimleri\n"
-        f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}sa vs 30g)\n\n"
-        f"En Cok Iyilesen:\n"
-    )
-    for i, (_, row) in enumerate(top_risers.iterrows(), 1):
-        line = f"  {i}. {row['label']}: {fv(row['tone_delta'])}\n"
-        if len(tweet) + len(line) + 80 > 280:
-            break
-        tweet += line
+        print("\n" + "=" * 50)
+        print(f"TWEET PREVIEW ({lang.upper()})")
+        print("=" * 50)
+        print(tweet)
+        print(f"\nCharacter count: {len(tweet)}")
 
-    neg_header = f"\nEn Cok Kotulesen:\n"
-    if len(tweet) + len(neg_header) + 60 < 280:
-        tweet += neg_header
-        for i, (_, row) in enumerate(top_fallers.iloc[::-1].iterrows(), 1):
-            line = f"  {i}. {row['label']}: {fv(row['tone_delta'])}\n"
-            if len(tweet) + len(line) + 60 > 280:
-                break
-            tweet += line
+        post_meta = {
+            "tweet_text": tweet,
+            "png_path": str(png_path),
+        }
+        post_path = OUTDIR / f"ranking_b3_movers{L['suffix']}_{tag}_post.json"
+        with open(post_path, "w") as f:
+            json.dump(post_meta, f, indent=2, ensure_ascii=False)
+        print(f"Saved: {post_path}")
 
-    tweet += (
-        f"\nYatirim tavsiyesi degildir.\n"
-        f"#KriptoDuygu #Bitcoin"
-    )
 
-    if len(tweet) > 280:
-        tweet = tweet[:277] + "..."
-
-    print("\n" + "="*50)
-    print("TWEET PREVIEW")
-    print("="*50)
-    print(tweet)
-    print(f"\nCharacter count: {len(tweet)}")
-
-    # ---------- 8) SAVE POST METADATA ----------
-    post_meta = {
-        "tweet_text": tweet,
-        "png_path": str(png_path),
-    }
-    post_path = OUTDIR / f"ranking_b3_movers_{tag}_post.json"
-    with open(post_path, "w") as f:
-        json.dump(post_meta, f, indent=2, ensure_ascii=False)
-    print(f"Saved: {post_path}")
+if __name__ == "__main__":
+    main()
