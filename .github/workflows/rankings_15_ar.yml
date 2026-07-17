@@ -1,8 +1,14 @@
-name: "12:00 — Coin Rankings TR (Type B, unified compute, TR post only)"
+name: "15:00 — Coin Rankings AR (Type B, own compute, AR post only)"
+
+# Restores the pre-2026-07-12 AR prime-time slot (18:00 Riyadh / 19:00 Dubai).
+# Runs the SAME unified fixed scripts as the 12:00 TR workflow — never the
+# inert _ar scripts (they carry the old head/tail defect). This run computes
+# its own 6h window (09:00–15:00 UTC), so AR posts differ from TR by timing,
+# per the 2026-07-14 design reversal. Only the *_ar_* post JSON is posted.
 
 on:
   schedule:
-    - cron: '0 12 * * *'
+    - cron: '0 15 * * *'
   workflow_dispatch:
 
 jobs:
@@ -16,8 +22,8 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        # arabic-reshaper + python-bidi installed explicitly: the unified B2
-        # script renders the Arabic chart and MUST have working shaping.
+        # arabic-reshaper + python-bidi installed explicitly: the unified
+        # scripts render the Arabic chart and MUST have working shaping.
         run: |
           pip install -r requirements.txt
           pip install arabic-reshaper python-bidi
@@ -44,29 +50,24 @@ jobs:
           BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
         run: python ${{ steps.pick.outputs.script }}
 
-      - name: Post to X (Turkish)
+      - name: Post to X (Arabic)
         env:
-          X_API_KEY: ${{ secrets.X_API_KEY }}
-          X_API_SECRET: ${{ secrets.X_API_SECRET }}
-          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
-          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          X_API_KEY: ${{ secrets.X_AR_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_AR_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_AR_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_AR_ACCESS_SECRET }}
         run: |
-          POST_JSON=$(ls gdelt_bq_results/*_post.json 2>/dev/null | grep -v '_ar_' | head -1)
+          POST_JSON=$(ls gdelt_bq_results/*_ar_*_post.json 2>/dev/null | head -1)
           if [ -n "$POST_JSON" ]; then
             python scripts/twitter_poster.py "$POST_JSON" ranking
           else
-            echo "No TR post JSON found, skipping tweet"
+            echo "No AR post JSON found (quiet-window gate), skipping tweet"
           fi
-
-      # AR posting moved to rankings_15_ar.yml (2026-07-18): each language
-      # posts at its own audience's prime time, each computing its own 6h
-      # window (design reversal recorded 2026-07-14). This workflow's script
-      # still renders AR outputs; they are simply not posted here.
 
       - name: Upload outputs
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ranking-${{ steps.pick.outputs.name }}-${{ github.run_id }}
+          name: ranking-ar-${{ steps.pick.outputs.name }}-${{ github.run_id }}
           path: gdelt_bq_results/
           retention-days: 30
