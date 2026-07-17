@@ -314,12 +314,8 @@ else:
                 transform=ax.transAxes, ha="right", va="top",
                 fontsize=12, fontweight="bold", color=color)
 
-        # Change badge
-        pct_str = f"{row['pct_change']:+.0%}"
-        ax.text(0.50, y, pct_str,
-                transform=ax.transAxes, ha="center", va="top",
-                fontsize=14, fontweight="bold", color=color,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor=color, edgecolor="none", alpha=0.12))
+        # (Change badge removed 2026-07-18: pct vs a near-zero baseline is
+        # uninterpretable noise, e.g. "-680%". Detection logic unchanged.)
 
         # Stats line
         stats_text = (
@@ -385,35 +381,140 @@ with open(json_path, "w") as f:
 print(f"Saved: {json_path}")
 
 # ---------- 8) TWEET TEXT ----------
+# Sentence-template builder (2026-07-18). Replaces the old fragment format
+# with full Arabic sentences. Tweet text is RAW Arabic — never passed through
+# ar(); shaping is for matplotlib charts only, X renders Arabic natively.
+# Deterministic, no API calls. The meaningless pct figure is no longer shown.
+# Overflow handled by a candidate ladder (never a mid-word "..." cut).
+
+# ---- TWEET HELPERS (pure, stdlib only — extracted verbatim by tests) ----
+def x_len(text):
+    """X weighted length: code points in X's weight-1 ranges count 1,
+    everything else (arrows, emoji, CJK) counts 2. Turkish and Arabic
+    letters are all weight 1."""
+    total = 0
+    for ch in text:
+        cp = ord(ch)
+        if cp <= 0x10FF or 0x2000 <= cp <= 0x200D or 0x2010 <= cp <= 0x201F \
+                or 0x2032 <= cp <= 0x2037:
+            total += 1
+        else:
+            total += 2
+    return total
+
+
+def coin_hashtag_ar(label):
+    # Bitcoin keeps the established Arabic flagship tag; all other coins use
+    # the English tag (the discovery convention in Arabic crypto X).
+    if str(label) == "Bitcoin":
+        return "#بيتكوين"
+    return "#" + str(label).replace(" ", "")
+
+
+def news_word_ar(n):
+    """Arabic counted-noun agreement for خبر: 3-10 -> أخبار, 11+ -> خبرًا."""
+    return "أخبار" if n <= 10 else "خبرًا"
+
+
+def direction_phrase_ar(coin, tone_current, tone_baseline, tone_delta):
+    """First clause: sign-aware so the wording never contradicts the numbers."""
+    big = abs(tone_delta) >= 1.5
+    if tone_delta < 0:
+        if tone_current <= -1:
+            if tone_baseline > -1:
+                base = f"تحوّل مزاج الأخبار حول {coin} إلى السلبية"
+                return (base + " بشكل حاد") if big else base
+            return f"تعمّقت النبرة السلبية في أخبار {coin}"
+        return f"تراجع مزاج الأخبار حول {coin} بشكل ملحوظ"
+    else:
+        if tone_current >= 1:
+            if tone_baseline < 1:
+                base = f"تحوّل مزاج الأخبار حول {coin} إلى الإيجابية"
+                return (base + " بقوة") if big else base
+            return f"تعزّزت النبرة الإيجابية في أخبار {coin}"
+        return f"تحسّن مزاج الأخبار حول {coin} بشكل ملحوظ"
+
+
+def lead_sentence_ar(row, window_hours, compact=False):
+    c, b, n = row["tone_current"], row["tone_baseline"], int(row["n_current"])
+    phrase = direction_phrase_ar(row["label"], c, b, row["tone_delta"])
+    if compact:
+        tail = (f"متوسط نبرة {n} {news_word_ar(n)} في آخر {window_hours} ساعات "
+                f"{c:+.2f} (30ي: {b:+.2f}).")
+    else:
+        tail = (f"متوسط نبرة {n} {news_word_ar(n)} في آخر {window_hours} ساعات "
+                f"بلغ {c:+.2f} مقابل {b:+.2f} كمتوسط 30 يومًا.")
+    return f"{phrase}: {tail}"
+
+
+def others_sentence_ar(others):
+    if not others:
+        return ""
+    up = sum(1 for r in others if r["direction"] == "positive")
+    down = len(others) - up
+    names = [str(r["label"]) for r in others]
+    lst = names[0] if len(names) == 1 else "، ".join(names[:-1]) + " و" + names[-1]
+    if len(others) == 1:
+        par = "صعود" if up else "هبوط"
+    elif down == 0:
+        par = "جميعها صعود"
+    elif up == 0:
+        par = "جميعها هبوط"
+    else:
+        par = f"{up} صعود، {down} هبوط"
+    return f"كما رُصد شذوذ أيضًا في {lst} ({par})."
+
+
+def others_count_ar(others):
+    if not others:
+        return ""
+    n = len(others)
+    if n == 1:
+        noun = "عملة أخرى"
+    elif n == 2:
+        noun = "عملتين أخريين"
+    else:
+        noun = f"{n} عملات أخرى"
+    return f"كما رُصد شذوذ في {noun}."
+
+
+def build_anomaly_tweet_ar(final_anomalies, now_utc, window_hours):
+    """Candidate ladder, first candidate fitting X's 280 weighted chars wins.
+    Degrades by shortening (list -> count -> omit), never by cutting words."""
+    lead = max(final_anomalies, key=lambda r: abs(r["tone_delta"]))
+    others = [r for r in final_anomalies if r["label"] != lead["label"]]
+
+    header = (f"شذوذ في معنويات العملات الرقمية | "
+              f"{now_utc.strftime('%d.%m.%Y %H:%M')} UTC")
+    footer = f"ليس نصيحة استثمارية.\n#كريبتو {coin_hashtag_ar(lead['label'])}"
+
+    # Ladder order: sacrifice formatting (compact baseline wording) before
+    # sacrificing information (others list -> count -> omitted).
+    candidates = []
+    for others_s in (others_sentence_ar(others), others_count_ar(others), ""):
+        for compact in (False, True):
+            lead_s = lead_sentence_ar(lead, window_hours, compact=compact)
+            body = lead_s if not others_s else f"{lead_s} {others_s}"
+            candidates.append(f"{header}\n\n{body}\n\n{footer}")
+    # Last resort: first clause only (no numbers). Cannot realistically trigger.
+    phrase = direction_phrase_ar(lead["label"], lead["tone_current"],
+                                 lead["tone_baseline"], lead["tone_delta"])
+    candidates.append(f"{header}\n\n{phrase}.\n\n{footer}")
+
+    for cand in candidates:
+        if x_len(cand) <= 280:
+            return cand
+    return candidates[-1]
+# ---- END TWEET HELPERS ----
+
 if len(final_anomalies) > 0:
-    tweet = (
-        f"شذوذ في معنويات العملات الرقمية\n"
-        f"{NOW_UTC.strftime('%d.%m.%Y %H:%M')} UTC\n\n"
-    )
-    for row in final_anomalies:
-        arrow = "▲" if row["direction"] == "positive" else "▼"
-        direction_tr = "صعود" if row["direction"] == "positive" else "هبوط"
-        line = (
-            f"{arrow} {row['label']}: {direction_tr}\n"
-            f"  {row['tone_current']:+.2f} (30d: {row['tone_baseline']:+.2f})\n"
-            f"  {row['pct_change']:+.0%} | {int(row['n_current'])} خبر\n\n"
-        )
-        if len(tweet) + len(line) + 60 > 280:  # leave room for footer
-            break
-        tweet += line
-    tweet += (
-        f"ليس نصيحة استثمارية.\n"
-        f"#كريبتو #بيتكوين"
-    )
-    # Hard truncate as safety net
-    if len(tweet) > 280:
-        tweet = tweet[:277] + "..."
+    tweet = build_anomaly_tweet_ar(final_anomalies, NOW_UTC, WINDOW_HOURS)
 
     print("\n" + "="*50)
     print("TWEET PREVIEW")
     print("="*50)
     print(tweet)
-    print(f"\nCharacter count: {len(tweet)}")
+    print(f"\nWeighted character count: {x_len(tweet)}")
 else:
     print("\nAnomali yok — tweet oluşturulmadı.")
 

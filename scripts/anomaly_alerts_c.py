@@ -313,12 +313,8 @@ else:
                 transform=ax.transAxes, ha="right", va="top",
                 fontsize=12, fontweight="bold", color=color)
 
-        # Change badge
-        pct_str = f"{row['pct_change']:+.0%}"
-        ax.text(0.50, y, pct_str,
-                transform=ax.transAxes, ha="center", va="top",
-                fontsize=14, fontweight="bold", color=color,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor=color, edgecolor="none", alpha=0.12))
+        # (Change badge removed 2026-07-18: pct vs a near-zero baseline is
+        # uninterpretable noise, e.g. "-680%". Detection logic unchanged.)
 
         # Stats line
         stats_text = (
@@ -338,13 +334,13 @@ else:
         y -= item_height
 
     # Auto-generated summary
-    biggest = max(final_anomalies, key=lambda r: abs(r["pct_change"]))
+    biggest = max(final_anomalies, key=lambda r: abs(r["tone_delta"]))
     n_up = sum(1 for r in final_anomalies if r["direction"] == "positive")
     n_down = sum(1 for r in final_anomalies if r["direction"] == "negative")
     summary = (
         f"Son {WINDOW_HOURS} saatte {len(df)} coin'den {n_alerts} anomali tespit edildi "
         f"({n_up} yükseliş, {n_down} düşüş). "
-        f"En büyük değişim: {biggest['label']} ({biggest['pct_change']:+.0%})."
+        f"En büyük değişim: {biggest['label']} (Δ ton {biggest['tone_delta']:+.2f})."
     )
     ax.text(0.5, max(y - 0.02, 0.08), summary,
             transform=ax.transAxes, ha="center", va="top",
@@ -397,35 +393,120 @@ with open(json_path, "w") as f:
 print(f"Saved: {json_path}")
 
 # ---------- 8) TWEET TEXT ----------
+# Sentence-template builder (2026-07-18). Replaces the old fragment format
+# ("Solana: DUSUS / Degisim: -680%") with full Turkish sentences a first-time
+# viewer can read. Deterministic: no API calls. The meaningless pct figure is
+# no longer shown anywhere in the tweet. Overflow is handled by a candidate
+# ladder (never a mid-word "..." cut).
+
+# ---- TWEET HELPERS (pure, stdlib only — extracted verbatim by tests) ----
+def x_len(text):
+    """X weighted length: code points in X's weight-1 ranges count 1,
+    everything else (arrows, emoji, CJK) counts 2. Turkish and Arabic
+    letters are all weight 1."""
+    total = 0
+    for ch in text:
+        cp = ord(ch)
+        if cp <= 0x10FF or 0x2000 <= cp <= 0x200D or 0x2010 <= cp <= 0x201F \
+                or 0x2032 <= cp <= 0x2037:
+            total += 1
+        else:
+            total += 2
+    return total
+
+
+def coin_hashtag_tr(label):
+    return "#" + str(label).replace(" ", "")
+
+
+def direction_phrase_tr(coin, tone_current, tone_baseline, tone_delta):
+    """First clause: what happened, in words. Sign-aware so we never say
+    'negatife döndü' when the tone is still positive."""
+    big = abs(tone_delta) >= 1.5
+    if tone_delta < 0:
+        if tone_current <= -1:
+            if tone_baseline > -1:
+                adv = "sert biçimde " if big else ""
+                return f"{coin} haberlerinde duygu {adv}negatife döndü"
+            return f"{coin} haberlerinde negatif ton daha da derinleşti"
+        return f"{coin} haberlerinde duygu belirgin şekilde zayıfladı"
+    else:
+        if tone_current >= 1:
+            if tone_baseline < 1:
+                adv = "güçlü biçimde " if big else ""
+                return f"{coin} haberlerinde duygu {adv}pozitife döndü"
+            return f"{coin} haberlerinde pozitif ton daha da güçlendi"
+        return f"{coin} haberlerinde duygu belirgin şekilde toparlandı"
+
+
+def lead_sentence_tr(row, window_hours, compact=False):
+    c, b, n = row["tone_current"], row["tone_baseline"], int(row["n_current"])
+    phrase = direction_phrase_tr(row["label"], c, b, row["tone_delta"])
+    baseline_part = f"30g ort. {b:+.2f}" if compact else f"30 günlük ort. {b:+.2f}"
+    return (f"{phrase}: son {window_hours} saatteki {n} haberin "
+            f"ortalama tonu {c:+.2f} ({baseline_part}).")
+
+
+def others_sentence_tr(others):
+    if not others:
+        return ""
+    up = sum(1 for r in others if r["direction"] == "positive")
+    down = len(others) - up
+    names = [str(r["label"]) for r in others]
+    lst = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " ve " + names[-1]
+    if len(others) == 1:
+        par = "yükseliş" if up else "düşüş"
+    elif down == 0:
+        par = "tümü yükseliş"
+    elif up == 0:
+        par = "tümü düşüş"
+    else:
+        par = f"{up} yükseliş, {down} düşüş"
+    return f"Ayrıca {lst} için de anomali tespit edildi ({par})."
+
+
+def others_count_tr(others):
+    if not others:
+        return ""
+    return f"Ayrıca {len(others)} coin'de daha anomali izlendi."
+
+
+def build_anomaly_tweet_tr(final_anomalies, now_utc, window_hours):
+    """Candidate ladder, first candidate fitting X's 280 weighted chars wins.
+    Degrades by shortening (list -> count -> omit), never by cutting words."""
+    lead = max(final_anomalies, key=lambda r: abs(r["tone_delta"]))
+    others = [r for r in final_anomalies if r["label"] != lead["label"]]
+
+    header = f"Kripto Duygu Anomalisi | {now_utc.strftime('%d.%m.%Y %H:%M')} UTC"
+    footer = f"Yatırım tavsiyesi değildir.\n#KriptoHaber {coin_hashtag_tr(lead['label'])}"
+
+    # Ladder order: sacrifice formatting (compact baseline wording) before
+    # sacrificing information (others list -> count -> omitted).
+    candidates = []
+    for others_s in (others_sentence_tr(others), others_count_tr(others), ""):
+        for compact in (False, True):
+            lead_s = lead_sentence_tr(lead, window_hours, compact=compact)
+            body = lead_s if not others_s else f"{lead_s} {others_s}"
+            candidates.append(f"{header}\n\n{body}\n\n{footer}")
+    # Last resort: first clause only (no numbers). Cannot realistically trigger.
+    phrase = direction_phrase_tr(lead["label"], lead["tone_current"],
+                                 lead["tone_baseline"], lead["tone_delta"])
+    candidates.append(f"{header}\n\n{phrase}.\n\n{footer}")
+
+    for cand in candidates:
+        if x_len(cand) <= 280:
+            return cand
+    return candidates[-1]
+# ---- END TWEET HELPERS ----
+
 if len(final_anomalies) > 0:
-    tweet = (
-        f"Kripto Duygu Anomalisi\n"
-        f"{NOW_UTC.strftime('%d.%m.%Y %H:%M')} UTC\n\n"
-    )
-    for row in final_anomalies:
-        arrow = "▲" if row["direction"] == "positive" else "▼"
-        direction_tr = "YUKSELIS" if row["direction"] == "positive" else "DUSUS"
-        line = (
-            f"{arrow} {row['label']}: {direction_tr}\n"
-            f"  Ton: {row['tone_current']:+.2f} (30g: {row['tone_baseline']:+.2f})\n"
-            f"  Degisim: {row['pct_change']:+.0%} | {int(row['n_current'])} haber\n\n"
-        )
-        if len(tweet) + len(line) + 60 > 280:  # leave room for footer
-            break
-        tweet += line
-    tweet += (
-        f"Yatirim tavsiyesi degildir.\n"
-        f"#KriptoHaber #Bitcoin"
-    )
-    # Hard truncate as safety net
-    if len(tweet) > 280:
-        tweet = tweet[:277] + "..."
+    tweet = build_anomaly_tweet_tr(final_anomalies, NOW_UTC, WINDOW_HOURS)
 
     print("\n" + "="*50)
     print("TWEET PREVIEW")
     print("="*50)
     print(tweet)
-    print(f"\nCharacter count: {len(tweet)}")
+    print(f"\nWeighted character count: {x_len(tweet)}")
 else:
     print("\nAnomali yok — tweet oluşturulmadı.")
 
