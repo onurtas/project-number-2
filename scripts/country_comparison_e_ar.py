@@ -369,35 +369,118 @@ with open(json_path, "w") as f:
 print(f"Saved: {json_path}")
 
 # ---------- 9) TWEET TEXT ----------
-def fv(v): return f"{v:+.1f}" if pd.notna(v) else "N/A"
+# Sentence-template builder (2026-07-18). Replaces the per-country list with
+# one readable Arabic summary: leader + deterministic mood bucket. Tweet text
+# is RAW Arabic — never ar()-shaped; shaping is chart-only, X renders
+# natively. No API calls; the chart carries the full numbers.
 
-# Top 5 from fixed markets by volume
+# ---- TWEET HELPERS (pure, stdlib only — extracted verbatim by tests) ----
+def x_len(text):
+    """X weighted length: code points in X's weight-1 ranges count 1,
+    everything else counts 2. Turkish and Arabic letters are all weight 1."""
+    total = 0
+    for ch in text:
+        cp = ord(ch)
+        if cp <= 0x10FF or 0x2000 <= cp <= 0x200D or 0x2010 <= cp <= 0x201F \
+                or 0x2032 <= cp <= 0x2037:
+            total += 1
+        else:
+            total += 2
+    return total
+
+
+def news_word_ar(n):
+    """Arabic counted-noun agreement for خبر: 3-10 -> أخبار, 11+ -> خبرًا."""
+    return "أخبار" if n <= 10 else "خبرًا"
+
+
+def tone_adjective_ar(t):
+    """Same bands as the chart legend / tone_color."""
+    if t <= -3:
+        return "نبرة سلبية واضحة"
+    if t <= -1:
+        return "نبرة سلبية طفيفة"
+    if t <= 1:
+        return "نبرة محايدة"
+    if t <= 3:
+        return "نبرة إيجابية طفيفة"
+    return "نبرة إيجابية واضحة"
+
+
+def mood_clause_ar(tones):
+    """Deterministic mood bucket over the fixed markets with data.
+    Bands: pos > +1, neutral [-1,+1], neg < -1. Empty string if < 3 markets."""
+    vals = [t for t in tones if t == t]  # drop NaN
+    if len(vals) < 3:
+        return ""
+    p = sum(1 for t in vals if t > 1)
+    n = sum(1 for t in vals if t < -1)
+    z = len(vals) - p - n
+    if p > n and p > z:
+        return "فيما بقيت معظم الأسواق الكبرى في النطاق الإيجابي."
+    if n > p and n > z:
+        return "فيما بقيت معظم الأسواق الكبرى في النطاق السلبي."
+    if z >= p and z >= n:
+        if n > p:
+            return "فيما بقيت معظم الأسواق الكبرى في نطاق محايد إلى سلبي."
+        if p > n:
+            return "فيما بقيت معظم الأسواق الكبرى في نطاق محايد إلى إيجابي."
+        return "فيما بقيت معظم الأسواق الكبرى في النطاق المحايد."
+    return "فيما جاءت الأسواق الكبرى متباينة."
+
+
+def build_country_tweet_ar(leader, fixed_tones, window_hours, ts_str):
+    """leader: (name, n_articles, avg_tone) or None on a fully empty window."""
+    header = f"مقارنة أخبار العملات الرقمية بين الدول | {ts_str} UTC"
+    footer = "ليس نصيحة استثمارية.\n#كريبتو #بيتكوين"
+
+    if leader is None:
+        body = (f"لم تتوفر بيانات كافية لأخبار الكريبتو على مستوى الدول "
+                f"في آخر {window_hours} ساعات.")
+        return f"{header}\n\n{body}\n\n{footer}"
+
+    name, n_articles, tone = leader
+    if tone == tone:  # not NaN
+        lead_s = (f"تصدّرت {name} أخبار الكريبتو في آخر {window_hours} ساعات "
+                  f"بـ{n_articles} {news_word_ar(n_articles)} "
+                  f"وب{tone_adjective_ar(tone)} ({tone:+.1f})")
+    else:
+        lead_s = (f"تصدّرت {name} أخبار الكريبتو في آخر {window_hours} ساعات "
+                  f"بـ{n_articles} {news_word_ar(n_articles)}")
+    mood_s = mood_clause_ar(fixed_tones)
+    body = f"{lead_s}، {mood_s}" if mood_s else f"{lead_s}."
+    cand = f"{header}\n\n{body}\n\n{footer}"
+    if x_len(cand) > 280:
+        cand = f"{header}\n\n{lead_s}.\n\n{footer}"  # drop mood clause
+    return cand
+# ---- END TWEET HELPERS ----
+
 df_fixed_sorted = df_fixed.sort_values("n_articles", ascending=False)
+if len(df_fixed_sorted) > 0:
+    _lead_row = df_fixed_sorted.iloc[0]
+elif len(df) > 0:
+    _lead_row = df.sort_values("n_articles", ascending=False).iloc[0]
+else:
+    _lead_row = None
 
-tweet = (
-    f"مقارنة أخبار العملات الرقمية بين الدول\n"
-    f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC ({WINDOW_HOURS}h)\n\n"
+if _lead_row is None:
+    leader = None
+else:
+    _tone = float(_lead_row["avg_tone"]) if pd.notna(_lead_row["avg_tone"]) else float("nan")
+    leader = (str(_lead_row["country_tr"]), int(_lead_row["n_articles"]), _tone)
+
+tweet = build_country_tweet_ar(
+    leader,
+    [float(t) if pd.notna(t) else float("nan") for t in df_fixed["avg_tone"].tolist()],
+    WINDOW_HOURS,
+    window_end.strftime('%d.%m.%Y %H:%M'),
 )
-for _, row in df_fixed_sorted.head(10).iterrows():
-    n = int(row["n_articles"])
-    line = f"  {row['country_tr']}: {n} خبر ({fv(row['avg_tone'])})\n"
-    if len(tweet) + len(line) + 60 > 280:
-        break
-    tweet += line
-
-tweet += (
-    f"\nليس نصيحة استثمارية.\n"
-    f"#كريبتو #بيتكوين"
-)
-
-if len(tweet) > 280:
-    tweet = tweet[:277] + "..."
 
 print("\n" + "="*50)
 print("TWEET PREVIEW")
 print("="*50)
 print(tweet)
-print(f"\nCharacter count: {len(tweet)}")
+print(f"\nWeighted character count: {x_len(tweet)}")
 
 # ---------- 10) SAVE POST METADATA ----------
 post_meta = {
