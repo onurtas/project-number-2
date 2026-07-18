@@ -290,10 +290,8 @@ else:
             transform=ax.transAxes, ha="center", va="top",
             fontsize=17, fontweight="bold", color="#DC2626")
 
-    window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}h)"
-    ax.text(0.5, 0.91, window_label,
-            transform=ax.transAxes, ha="center", va="top",
-            fontsize=10, color="#6B7280")
+    # (Timestamp subtitle removed 2026-07-18: housekeeping info, not
+    # follower-facing; the tweet text carries the date and window.)
 
     y = 0.84
     item_height = 0.78 / max(n_alerts, 1)

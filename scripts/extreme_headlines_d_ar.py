@@ -347,10 +347,8 @@ else:
             transform=ax.transAxes, ha="center", va="top",
             fontsize=18, fontweight="bold", color="#111827")
 
-    window_label = f"{NOW_UTC.strftime('%d.%m.%Y %H:%M')} UTC"
-    ax.text(0.5, 0.93, window_label,
-            transform=ax.transAxes, ha="center", va="top",
-            fontsize=10, color="#6B7280")
+    # (Timestamp subtitle removed 2026-07-18: housekeeping info, not
+    # follower-facing; the tweet text carries the date and window.)
 
     y = 0.87
 

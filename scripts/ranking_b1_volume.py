@@ -284,11 +284,8 @@ def render_chart(lang, L, df_top_desc, df_all, window_start, window_end, tag):
 
     ax.set_title(T(L["title"]), fontsize=17, fontweight="bold", color="#111827", pad=20)
 
-    window_label = (f"{window_start.strftime('%d.%m.%Y %H:%M')} – "
-                    f"{window_end.strftime('%H:%M')} UTC  "
-                    f"({WINDOW_HOURS}{L['window_word']})")
-    ax.text(0.5, 1.02, window_label, transform=ax.transAxes,
-            ha="center", fontsize=10, color="#6B7280")
+    # (Timestamp subtitle removed 2026-07-18: housekeeping info, not
+    # follower-facing; the tweet text carries the date and window.)
 
     legend_elements = [Patch(facecolor=c, label=T(lbl))
                        for c, lbl in zip(LEGEND_COLORS, L["legend"])]

@@ -286,9 +286,8 @@ ax1.xaxis.grid(True, alpha=0.15, color="#9CA3AF")
 ax1.set_title(ar("الأسواق الكبرى — عدد الأخبار ومتوسط النبرة"),
               fontsize=14, fontweight="bold", color="#111827", pad=20)
 
-window_label = f"{window_start.strftime('%d.%m.%Y %H:%M')} – {window_end.strftime('%H:%M')} UTC  ({WINDOW_HOURS}h)"
-ax1.text(0.5, 1.02, window_label,
-         transform=ax1.transAxes, ha="center", fontsize=10, color="#6B7280")
+# (Timestamp subtitle removed 2026-07-18: housekeeping info, not
+# follower-facing; the tweet text carries the date and window.)
 
 # Legend
 legend_elements = [
