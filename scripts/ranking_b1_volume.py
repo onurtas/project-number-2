@@ -111,10 +111,10 @@ LANGS = {
         "legend_title": "Renk = Ortalama Ton",
         "summary": "{top1} en çok haber alan coin oldu ({n1} haber). Son {h} saatte {coins} coin'de toplam {total:,} haber yayınlandı.",
         "footer": "Yatırım tavsiyesi değildir.",
-        "tweet_title": "En Cok Haber Alan Kripto Paralar",
+        "tweet_title": "En Çok Haber Alan Kripto Paralar",
         "tweet_window_word": "sa",
         "tweet_articles_word": "haber",
-        "tweet_footer": "Yatirim tavsiyesi degildir.",
+        "tweet_footer": "Yatırım tavsiyesi değildir.",
         "hashtags": "#KriptoHaber #Bitcoin",
         "rtl": False,
     },
@@ -317,27 +317,69 @@ def render_chart(lang, L, df_top_desc, df_all, window_start, window_end, tag):
 
 
 # ---------- TWEET ----------
+# Sentence-template builder (2026-07-18). Replaces the numbered coin list
+# (which duplicated the chart) with one readable summary + dynamic coin
+# hashtag. Deterministic, no API calls, no truncation.
+
+# ---- TWEET HELPERS (pure, stdlib only — extracted verbatim by tests) ----
+def x_len(text):
+    """X weighted length: code points in X's weight-1 ranges count 1,
+    everything else counts 2. Turkish and Arabic letters are all weight 1."""
+    total = 0
+    for ch in text:
+        cp = ord(ch)
+        if cp <= 0x10FF or 0x2000 <= cp <= 0x200D or 0x2010 <= cp <= 0x201F \
+                or 0x2032 <= cp <= 0x2037:
+            total += 1
+        else:
+            total += 2
+    return total
+
+
+def coin_hashtag(label, is_ar):
+    """Dynamic subject tag. Bitcoin keeps the Arabic flagship tag on AR;
+    all other coins use the English tag (the discovery convention)."""
+    if is_ar and str(label) == "Bitcoin":
+        return "#بيتكوين"
+    return "#" + str(label).replace(" ", "")
+
+
+def news_word_ar(n):
+    """Arabic counted-noun agreement for خبر: 3-10 -> أخبار, 11+ -> خبرًا."""
+    return "أخبار" if n <= 10 else "خبرًا"
+
+
 def build_tweet(L, df_all, window_end):
-    def fv(v):
-        return f"{v:+.1f}" if pd.notna(v) else "N/A"
+    df_sorted = df_all.sort_values("n_articles", ascending=False)
+    lead = df_sorted.iloc[0]
+    lead_label = str(lead["label"])
+    lead_n = int(lead["n_articles"])
+    k = min(TOP_N, len(df_sorted))
+    total_top = int(df_sorted.head(TOP_N)["n_articles"].sum())
 
-    tweet = (
-        f"{L['tweet_title']}\n"
-        f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC "
-        f"({WINDOW_HOURS}{L['tweet_window_word']})\n\n"
-    )
-    for i, (_, row) in enumerate(df_all.head(TOP_N).iterrows(), 1):
-        line = (f"{i}. {row['label']}: {int(row['n_articles'])} "
-                f"{L['tweet_articles_word']} ({fv(row['avg_tone'])})\n")
-        if len(tweet) + len(line) + 60 > 280:
-            break
-        tweet += line
+    header = f"{L['tweet_title']} | {window_end.strftime('%d.%m.%Y %H:%M')} UTC"
+    base_tag = L["hashtags"].split()[0]
+    footer = f"{L['tweet_footer']}\n{base_tag} {coin_hashtag(lead_label, L['rtl'])}"
 
-    tweet += f"\n{L['tweet_footer']}\n{L['hashtags']}"
+    if L["rtl"]:
+        body = (f"كان {lead_label} الأكثر حضورًا في أخبار الكريبتو خلال آخر "
+                f"{WINDOW_HOURS} ساعات بـ{lead_n} {news_word_ar(lead_n)}، "
+                f"فيما بلغ مجموع أخبار أبرز {k} عملات "
+                f"{total_top} {news_word_ar(total_top)}.")
+        short = (f"كان {lead_label} الأكثر حضورًا في أخبار الكريبتو خلال آخر "
+                 f"{WINDOW_HOURS} ساعات بـ{lead_n} {news_word_ar(lead_n)}.")
+    else:
+        body = (f"Son {WINDOW_HOURS} saatte en çok konuşulan coin {lead_label} "
+                f"oldu ({lead_n} haber). İlk {k} coin toplam {total_top} "
+                f"haberde yer aldı.")
+        short = (f"Son {WINDOW_HOURS} saatte en çok konuşulan coin "
+                 f"{lead_label} oldu ({lead_n} haber).")
 
-    if len(tweet) > 280:
-        tweet = tweet[:277] + "..."
+    tweet = f"{header}\n\n{body}\n\n{footer}"
+    if x_len(tweet) > 280:
+        tweet = f"{header}\n\n{short}\n\n{footer}"
     return tweet
+# ---- END TWEET HELPERS ----
 
 
 # ---------- MAIN ----------

@@ -116,11 +116,11 @@ LANGS = {
         "summary_pos_only": "En çok iyileşen: {pos}. {n} coin'in 30 günlük bazlına göre değişimi.",
         "summary_neg_only": "En çok kötüleşen: {neg}. {n} coin'in 30 günlük bazlına göre değişimi.",
         "footer": "Yatırım tavsiyesi değildir.",
-        "tweet_title": "En Buyuk Duygu Degisimleri",
+        "tweet_title": "En Büyük Duygu Değişimleri",
         "tweet_window": "sa vs 30g",
         "tweet_pos_header": "En Cok Iyilesen:",
         "tweet_neg_header": "En Cok Kotulesen:",
-        "tweet_footer": "Yatirim tavsiyesi degildir.",
+        "tweet_footer": "Yatırım tavsiyesi değildir.",
         "hashtags": "#KriptoDuygu #Bitcoin",
         "rtl": False,
     },
@@ -338,39 +338,108 @@ def render_chart(lang, L, df_show, top_risers, top_fallers,
 
 
 # ---------- TWEET ----------
+# Sentence-template builder (2026-07-18). Replaces the riser/faller lists
+# (which duplicated the chart) with one readable summary + dynamic coin
+# hashtag. Values are Δ tone vs the 30-day baseline, labelled as such.
+# Deterministic, no API calls, no truncation.
+
+# ---- TWEET HELPERS (pure, stdlib only — extracted verbatim by tests) ----
+def x_len(text):
+    """X weighted length: code points in X's weight-1 ranges count 1,
+    everything else counts 2. Turkish and Arabic letters are all weight 1."""
+    total = 0
+    for ch in text:
+        cp = ord(ch)
+        if cp <= 0x10FF or 0x2000 <= cp <= 0x200D or 0x2010 <= cp <= 0x201F \
+                or 0x2032 <= cp <= 0x2037:
+            total += 1
+        else:
+            total += 2
+    return total
+
+
+def coin_hashtag(label, is_ar):
+    """Dynamic subject tag. Bitcoin keeps the Arabic flagship tag on AR;
+    all other coins use the English tag (the discovery convention)."""
+    if is_ar and str(label) == "Bitcoin":
+        return "#بيتكوين"
+    return "#" + str(label).replace(" ", "")
+
+
 def build_tweet(L, top_risers, top_fallers, window_end):
-    def fv(v):
-        return f"{v:+.2f}" if pd.notna(v) else "N/A"
+    riser = top_risers.iloc[0] if len(top_risers) else None
+    faller = top_fallers.iloc[0] if len(top_fallers) else None
 
-    tweet = (
-        f"{L['tweet_title']}\n"
-        f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC "
-        f"({WINDOW_HOURS}{L['tweet_window']})\n"
-    )
+    if L["rtl"]:
+        if riser is not None and faller is not None:
+            body = (f"مقارنة بمتوسط 30 يومًا، كان {riser['label']} الأكثر "
+                    f"تحسنًا في نبرة الأخبار خلال آخر {WINDOW_HOURS} ساعات "
+                    f"(Δ {riser['tone_delta']:+.2f})، فيما كان "
+                    f"{faller['label']} الأكثر تراجعًا "
+                    f"(Δ {faller['tone_delta']:+.2f}).")
+        elif riser is not None:
+            body = (f"مقارنة بمتوسط 30 يومًا، كان {riser['label']} الأكثر "
+                    f"تحسنًا في نبرة الأخبار خلال آخر {WINDOW_HOURS} ساعات "
+                    f"(Δ {riser['tone_delta']:+.2f})، ولم يُسجل تراجع يُذكر.")
+        elif faller is not None:
+            body = (f"مقارنة بمتوسط 30 يومًا، كان {faller['label']} الأكثر "
+                    f"تراجعًا في نبرة الأخبار خلال آخر {WINDOW_HOURS} ساعات "
+                    f"(Δ {faller['tone_delta']:+.2f})، ولم يُسجل تحسن يُذكر.")
+        else:
+            body = (f"لم يُسجل تغير يُذكر في نبرة الأخبار مقارنة بمتوسط "
+                    f"30 يومًا.")
+    else:
+        if riser is not None and faller is not None:
+            body = (f"30 günlük ortalamaya kıyasla son {WINDOW_HOURS} saatte "
+                    f"haber tonu en çok iyileşen coin {riser['label']} "
+                    f"(Δ {riser['tone_delta']:+.2f}), en çok bozulan "
+                    f"{faller['label']} (Δ {faller['tone_delta']:+.2f}) oldu.")
+        elif riser is not None:
+            body = (f"30 günlük ortalamaya kıyasla son {WINDOW_HOURS} saatte "
+                    f"haber tonu en çok iyileşen coin {riser['label']} "
+                    f"(Δ {riser['tone_delta']:+.2f}) oldu; belirgin bozulma "
+                    f"gözlenmedi.")
+        elif faller is not None:
+            body = (f"30 günlük ortalamaya kıyasla son {WINDOW_HOURS} saatte "
+                    f"haber tonu en çok bozulan coin {faller['label']} "
+                    f"(Δ {faller['tone_delta']:+.2f}) oldu; belirgin iyileşme "
+                    f"gözlenmedi.")
+        else:
+            body = (f"30 günlük ortalamaya kıyasla haber tonunda belirgin "
+                    f"bir değişim gözlenmedi.")
 
-    if len(top_risers):
-        tweet += f"\n{L['tweet_pos_header']}\n"
-        for i, (_, row) in enumerate(top_risers.iterrows(), 1):
-            line = f"  {i}. {row['label']}: {fv(row['tone_delta'])}\n"
-            if len(tweet) + len(line) + 80 > 280:
-                break
-            tweet += line
+    # Subject tag: the mover with the larger |Δ|; Bitcoin as safe default.
+    lead_label = "Bitcoin"
+    if riser is not None and faller is not None:
+        lead_label = str(riser["label"]) if abs(riser["tone_delta"]) >= abs(faller["tone_delta"]) \
+            else str(faller["label"])
+    elif riser is not None:
+        lead_label = str(riser["label"])
+    elif faller is not None:
+        lead_label = str(faller["label"])
 
-    if len(top_fallers):
-        neg_header = f"\n{L['tweet_neg_header']}\n"
-        if len(tweet) + len(neg_header) + 60 < 280:
-            tweet += neg_header
-            for i, (_, row) in enumerate(top_fallers.iterrows(), 1):
-                line = f"  {i}. {row['label']}: {fv(row['tone_delta'])}\n"
-                if len(tweet) + len(line) + 60 > 280:
-                    break
-                tweet += line
+    header = f"{L['tweet_title']} | {window_end.strftime('%d.%m.%Y %H:%M')} UTC"
+    base_tag = L["hashtags"].split()[0]
+    footer = f"{L['tweet_footer']}\n{base_tag} {coin_hashtag(lead_label, L['rtl'])}"
 
-    tweet += f"\n{L['tweet_footer']}\n{L['hashtags']}"
-
-    if len(tweet) > 280:
-        tweet = tweet[:277] + "..."
+    tweet = f"{header}\n\n{body}\n\n{footer}"
+    if x_len(tweet) > 280 and riser is not None and faller is not None:
+        # Fallback: keep only the stronger mover (complete sentence, no cut).
+        if abs(riser["tone_delta"]) >= abs(faller["tone_delta"]):
+            body = (f"مقارنة بمتوسط 30 يومًا، كان {riser['label']} الأكثر "
+                    f"تحسنًا في نبرة الأخبار (Δ {riser['tone_delta']:+.2f}).") \
+                if L["rtl"] else \
+                   (f"30 günlük ortalamaya kıyasla haber tonu en çok iyileşen "
+                    f"coin {riser['label']} (Δ {riser['tone_delta']:+.2f}) oldu.")
+        else:
+            body = (f"مقارنة بمتوسط 30 يومًا، كان {faller['label']} الأكثر "
+                    f"تراجعًا في نبرة الأخبار (Δ {faller['tone_delta']:+.2f}).") \
+                if L["rtl"] else \
+                   (f"30 günlük ortalamaya kıyasla haber tonu en çok bozulan "
+                    f"coin {faller['label']} (Δ {faller['tone_delta']:+.2f}) oldu.")
+        tweet = f"{header}\n\n{body}\n\n{footer}"
     return tweet
+# ---- END TWEET HELPERS ----
 
 
 # ---------- MAIN ----------

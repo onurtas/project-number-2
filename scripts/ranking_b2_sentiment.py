@@ -122,11 +122,11 @@ LANGS = {
         "summary_pos_only": "En pozitif: {pos}. ABD medyasında {n} coin değerlendirildi.",
         "summary_neg_only": "En negatif: {neg}. ABD medyasında {n} coin değerlendirildi.",
         "footer": "Yatırım tavsiyesi değildir.",
-        "tweet_title": "Kripto Duygu Siralamasi (ABD)",
+        "tweet_title": "Kripto Duygu Sıralaması (ABD)",
         "tweet_window_word": "sa",
         "tweet_pos_header": "En Pozitif:",
         "tweet_neg_header": "En Negatif:",
-        "tweet_footer": "Yatirim tavsiyesi degildir.",
+        "tweet_footer": "Yatırım tavsiyesi değildir.",
         "hashtags": "#KriptoDuygu #Bitcoin",
         "rtl": False,
     },
@@ -394,39 +394,103 @@ def render_chart(lang, L, df_show, top_positive, top_negative,
 
 
 # ---------- TWEET ----------
+# Sentence-template builder (2026-07-18). Replaces the pos/neg coin lists
+# (which duplicated the chart) with one readable summary + dynamic coin
+# hashtag. Deterministic, no API calls, no truncation.
+
+# ---- TWEET HELPERS (pure, stdlib only — extracted verbatim by tests) ----
+def x_len(text):
+    """X weighted length: code points in X's weight-1 ranges count 1,
+    everything else counts 2. Turkish and Arabic letters are all weight 1."""
+    total = 0
+    for ch in text:
+        cp = ord(ch)
+        if cp <= 0x10FF or 0x2000 <= cp <= 0x200D or 0x2010 <= cp <= 0x201F \
+                or 0x2032 <= cp <= 0x2037:
+            total += 1
+        else:
+            total += 2
+    return total
+
+
+def coin_hashtag(label, is_ar):
+    """Dynamic subject tag. Bitcoin keeps the Arabic flagship tag on AR;
+    all other coins use the English tag (the discovery convention)."""
+    if is_ar and str(label) == "Bitcoin":
+        return "#بيتكوين"
+    return "#" + str(label).replace(" ", "")
+
+
 def build_tweet(L, top_positive, top_negative, window_end):
-    def fv(v):
-        return f"{v:+.2f}" if pd.notna(v) else "N/A"
+    best = top_positive.iloc[0] if len(top_positive) else None
+    worst = top_negative.iloc[0] if len(top_negative) else None
 
-    tweet = (
-        f"{L['tweet_title']}\n"
-        f"{window_end.strftime('%d.%m.%Y %H:%M')} UTC "
-        f"({WINDOW_HOURS}{L['tweet_window_word']})\n"
-    )
+    if L["rtl"]:
+        if best is not None and worst is not None:
+            body = (f"سجل {best['label']} النبرة الأكثر إيجابية في أخبار آخر "
+                    f"{WINDOW_HOURS} ساعات ({best['avg_tone']:+.2f})، فيما سجل "
+                    f"{worst['label']} النبرة الأكثر سلبية "
+                    f"({worst['avg_tone']:+.2f}).")
+        elif best is not None:
+            body = (f"سجل {best['label']} النبرة الأكثر إيجابية في أخبار آخر "
+                    f"{WINDOW_HOURS} ساعات ({best['avg_tone']:+.2f})، "
+                    f"ولم تبرز عملات ذات نبرة سلبية.")
+        elif worst is not None:
+            body = (f"سجل {worst['label']} النبرة الأكثر سلبية في أخبار آخر "
+                    f"{WINDOW_HOURS} ساعات ({worst['avg_tone']:+.2f})، "
+                    f"ولم تبرز عملات ذات نبرة إيجابية.")
+        else:
+            body = (f"لم يُسجل تباين واضح في نبرة الأخبار خلال آخر "
+                    f"{WINDOW_HOURS} ساعات.")
+    else:
+        if best is not None and worst is not None:
+            body = (f"Son {WINDOW_HOURS} saatte haber tonu en olumlu coin "
+                    f"{best['label']} ({best['avg_tone']:+.2f}), en olumsuz "
+                    f"{worst['label']} ({worst['avg_tone']:+.2f}) oldu.")
+        elif best is not None:
+            body = (f"Son {WINDOW_HOURS} saatte haber tonu en olumlu coin "
+                    f"{best['label']} ({best['avg_tone']:+.2f}) oldu; negatif "
+                    f"tonlu coin öne çıkmadı.")
+        elif worst is not None:
+            body = (f"Son {WINDOW_HOURS} saatte haber tonu en olumsuz coin "
+                    f"{worst['label']} ({worst['avg_tone']:+.2f}) oldu; pozitif "
+                    f"tonlu coin öne çıkmadı.")
+        else:
+            body = (f"Son {WINDOW_HOURS} saatte belirgin bir ton ayrışması "
+                    f"gözlenmedi.")
 
-    if len(top_positive):
-        tweet += f"\n{L['tweet_pos_header']}\n"
-        for i, (_, row) in enumerate(top_positive.iterrows(), 1):
-            line = f"  {i}. {row['label']}: {fv(row['avg_tone'])}\n"
-            if len(tweet) + len(line) + 80 > 280:
-                break
-            tweet += line
+    # Subject tag: the extreme with the larger |tone|; Bitcoin as safe default.
+    lead_label = "Bitcoin"
+    if best is not None and worst is not None:
+        lead_label = str(best["label"]) if abs(best["avg_tone"]) >= abs(worst["avg_tone"]) \
+            else str(worst["label"])
+    elif best is not None:
+        lead_label = str(best["label"])
+    elif worst is not None:
+        lead_label = str(worst["label"])
 
-    if len(top_negative):
-        neg_header = f"\n{L['tweet_neg_header']}\n"
-        if len(tweet) + len(neg_header) + 60 < 280:
-            tweet += neg_header
-            for i, (_, row) in enumerate(top_negative.iterrows(), 1):
-                line = f"  {i}. {row['label']}: {fv(row['avg_tone'])}\n"
-                if len(tweet) + len(line) + 60 > 280:
-                    break
-                tweet += line
+    header = f"{L['tweet_title']} | {window_end.strftime('%d.%m.%Y %H:%M')} UTC"
+    base_tag = L["hashtags"].split()[0]
+    footer = f"{L['tweet_footer']}\n{base_tag} {coin_hashtag(lead_label, L['rtl'])}"
 
-    tweet += f"\n{L['tweet_footer']}\n{L['hashtags']}"
-
-    if len(tweet) > 280:
-        tweet = tweet[:277] + "..."
+    tweet = f"{header}\n\n{body}\n\n{footer}"
+    if x_len(tweet) > 280 and best is not None and worst is not None:
+        # Fallback: keep only the stronger extreme (complete sentence, no cut).
+        if abs(best["avg_tone"]) >= abs(worst["avg_tone"]):
+            keep, tone_v = best, best["avg_tone"]
+            body = (f"سجل {keep['label']} النبرة الأكثر إيجابية في أخبار آخر "
+                    f"{WINDOW_HOURS} ساعات ({tone_v:+.2f}).") if L["rtl"] else \
+                   (f"Son {WINDOW_HOURS} saatte haber tonu en olumlu coin "
+                    f"{keep['label']} ({tone_v:+.2f}) oldu.")
+        else:
+            keep, tone_v = worst, worst["avg_tone"]
+            body = (f"سجل {keep['label']} النبرة الأكثر سلبية في أخبار آخر "
+                    f"{WINDOW_HOURS} ساعات ({tone_v:+.2f}).") if L["rtl"] else \
+                   (f"Son {WINDOW_HOURS} saatte haber tonu en olumsuz coin "
+                    f"{keep['label']} ({tone_v:+.2f}) oldu.")
+        tweet = f"{header}\n\n{body}\n\n{footer}"
     return tweet
+# ---- END TWEET HELPERS ----
 
 
 # ---------- MAIN ----------
