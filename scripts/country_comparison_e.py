@@ -232,14 +232,20 @@ for _, row in df_dynamic.iloc[::-1].iterrows():
     print(f"  {row['country_tr']:20s}  {int(row['n_articles']):5d} haber  ton: {row['avg_tone']:+.2f}")
 
 # ---------- 7) VISUALIZATION ----------
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12),
-                                gridspec_kw={"height_ratios": [3, 2]})
+# Dynamic layout (2026-07-19): panel heights scale with the actual bar
+# counts, so a sparse window can no longer balloon one bar across a
+# fixed-size panel (same mechanism as the B1/B2/B3 ranking charts).
+ROW_H = 0.55          # inches per bar row
+PANEL_OVERHEAD = 1.2  # inches per panel for title + x-axis
+n1 = len(df_fixed)
+n2 = len(df_dynamic)
+h1 = n1 * ROW_H + PANEL_OVERHEAD if n1 > 0 else 1.2
+h2 = n2 * ROW_H + PANEL_OVERHEAD if n2 > 0 else 1.2
+fig_height = max(4.5, h1 + h2 + 0.9)  # 0.9 = legend + footer margin
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, fig_height),
+                                gridspec_kw={"height_ratios": [h1, h2]})
 
 # ===================== VIEW 1: Fixed 10 Markets =====================
-y1 = range(len(df_fixed))
-volumes1 = df_fixed["n_articles"].values
-tones1 = df_fixed["avg_tone"].values
-
 # Bar color by tone
 def tone_color(t):
     if pd.isna(t): return "#D1D5DB"
@@ -249,52 +255,51 @@ def tone_color(t):
     if t <= 3:  return "#34D399"
     return "#22C55E"
 
-colors1 = [tone_color(t) for t in tones1]
+if n1 > 0:
+    y1 = range(len(df_fixed))
+    volumes1 = df_fixed["n_articles"].values
+    tones1 = df_fixed["avg_tone"].values
 
-bars1 = ax1.barh(y1, volumes1, color=colors1, height=0.6, edgecolor="white", linewidth=0.5)
 
-# Labels on bars
-for bar, (_, row) in zip(bars1, df_fixed.iterrows()):
-    n = int(row["n_articles"])
-    t = row["avg_tone"]
-    # Volume at end of bar
-    ax1.text(bar.get_width() + max(volumes1) * 0.02, bar.get_y() + bar.get_height()/2,
-            f"{n}",
-            ha="left", va="center", fontsize=9, fontweight="bold", color="#374151")
-    # Tone inside bar (if wide enough)
-    if bar.get_width() > max(max(volumes1) * 0.12, 1) and pd.notna(t):
-        ax1.text(bar.get_width() - max(volumes1) * 0.02, bar.get_y() + bar.get_height()/2,
-                f"{t:+.1f}",
-                ha="right", va="center", fontsize=8, color="white", fontweight="bold", alpha=0.9)
+    colors1 = [tone_color(t) for t in tones1]
 
-ax1.set_yticks(y1)
-ax1.set_yticklabels(df_fixed["country_tr"], fontsize=11, fontweight="bold", color="#111827")
-ax1.set_xlabel("Haber Sayısı", fontsize=10, color="#4B5563", fontweight="bold")
-ax1.set_xlim(0, max(max(volumes1), 1) * 1.15)
+    bars1 = ax1.barh(y1, volumes1, color=colors1, height=0.6, edgecolor="white", linewidth=0.5)
 
-ax1.spines["top"].set_visible(False)
-ax1.spines["right"].set_visible(False)
-ax1.spines["left"].set_visible(False)
-ax1.tick_params(left=False)
-ax1.xaxis.grid(True, alpha=0.15, color="#9CA3AF")
+    # Labels on bars
+    for bar, (_, row) in zip(bars1, df_fixed.iterrows()):
+        n = int(row["n_articles"])
+        t = row["avg_tone"]
+        # Volume at end of bar
+        ax1.text(bar.get_width() + max(volumes1) * 0.02, bar.get_y() + bar.get_height()/2,
+                f"{n}",
+                ha="left", va="center", fontsize=9, fontweight="bold", color="#374151")
+        # Tone inside bar (if wide enough)
+        if bar.get_width() > max(max(volumes1) * 0.12, 1) and pd.notna(t):
+            ax1.text(bar.get_width() - max(volumes1) * 0.02, bar.get_y() + bar.get_height()/2,
+                    f"{t:+.1f}",
+                    ha="right", va="center", fontsize=8, color="white", fontweight="bold", alpha=0.9)
 
-ax1.set_title("Büyük Kripto Piyasaları — Yayınlanan Haber Sayısı ve Ortalama Duygu",
-              fontsize=14, fontweight="bold", color="#111827", pad=20)
+    ax1.set_yticks(y1)
+    ax1.set_yticklabels(df_fixed["country_tr"], fontsize=11, fontweight="bold", color="#111827")
+    ax1.set_xlabel("Haber Sayısı", fontsize=10, color="#4B5563", fontweight="bold")
+    ax1.set_xlim(0, max(max(volumes1), 1) * 1.15)
+    ax1.set_ylim(-0.5, len(df_fixed) - 0.5)
 
-# (Timestamp subtitle removed 2026-07-18: housekeeping info, not
-# follower-facing; the tweet text carries the date and window.)
+    ax1.spines["top"].set_visible(False)
+    ax1.spines["right"].set_visible(False)
+    ax1.spines["left"].set_visible(False)
+    ax1.tick_params(left=False)
+    ax1.xaxis.grid(True, alpha=0.15, color="#9CA3AF")
 
-# Legend
-legend_elements = [
-    Patch(facecolor="#22C55E", label="Yükseliş (+3 üzeri)"),
-    Patch(facecolor="#34D399", label="Hafif Yükseliş (+1 / +3)"),
-    Patch(facecolor="#FBBF24", label="Nötr (-1 / +1)"),
-    Patch(facecolor="#F97316", label="Hafif Düşüş (-3 / -1)"),
-    Patch(facecolor="#EF4444", label="Düşüş (-3 altı)"),
-]
-ax1.legend(handles=legend_elements, loc="lower right", fontsize=6.5,
-           title="Renk = Ortalama Ton", title_fontsize=7.5,
-           framealpha=0.9, edgecolor="#D1D5DB")
+    ax1.set_title("Büyük Kripto Piyasaları — Yayınlanan Haber Sayısı ve Ortalama Duygu",
+                  fontsize=14, fontweight="bold", color="#111827", pad=20)
+
+    # (Timestamp subtitle removed 2026-07-18: housekeeping info, not
+    # follower-facing; the tweet text carries the date and window.)
+else:
+    ax1.text(0.5, 0.5, "Yeterli veri yok", ha="center", va="center",
+             fontsize=14, color="#9CA3AF", transform=ax1.transAxes)
+    ax1.axis("off")
 
 # ===================== VIEW 2: Dynamic Top 10 =====================
 if len(df_dynamic) > 0:
@@ -316,6 +321,7 @@ if len(df_dynamic) > 0:
     ax2.set_yticklabels(df_dynamic["country_tr"], fontsize=10, fontweight="bold", color="#111827")
     ax2.set_xlabel("Haber Sayısı", fontsize=10, color="#4B5563", fontweight="bold")
     ax2.set_xlim(0, max(volumes2) * 1.25)
+    ax2.set_ylim(-0.5, len(df_dynamic) - 0.5)
 
     ax2.spines["top"].set_visible(False)
     ax2.spines["right"].set_visible(False)
@@ -330,12 +336,26 @@ else:
              fontsize=14, color="#9CA3AF", transform=ax2.transAxes)
     ax2.axis("off")
 
+# Legend (figure-level since 2026-07-19: an in-panel legend cannot
+# fit once the top panel is compact on sparse windows).
+legend_elements = [
+    Patch(facecolor="#22C55E", label="Yükseliş (+3 üzeri)"),
+    Patch(facecolor="#34D399", label="Hafif Yükseliş (+1 / +3)"),
+    Patch(facecolor="#FBBF24", label="Nötr (-1 / +1)"),
+    Patch(facecolor="#F97316", label="Hafif Düşüş (-3 / -1)"),
+    Patch(facecolor="#EF4444", label="Düşüş (-3 altı)"),
+]
+fig.legend(handles=legend_elements, loc="lower center",
+           bbox_to_anchor=(0.5, 0.30 / fig_height), ncol=5, fontsize=6.5,
+           title="Renk = Ortalama Ton", title_fontsize=7.5,
+           framealpha=0.9, edgecolor="#D1D5DB")
+
 # Footer
-fig.text(0.5, 0.01,
+fig.text(0.5, 0.10 / fig_height,
          f"Yatırım tavsiyesi değildir.",
          ha="center", fontsize=7, color="#9CA3AF")
 
-plt.tight_layout(rect=[0, 0.03, 1, 1])
+plt.tight_layout(rect=[0, 0.95 / fig_height, 1, 1])
 
 # Save
 OUTDIR = pathlib.Path("gdelt_bq_results"); OUTDIR.mkdir(exist_ok=True)
