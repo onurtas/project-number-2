@@ -206,6 +206,10 @@ REJECT if:
 - War, military operations, or geopolitical conflicts (even if crypto is tangentially mentioned)
 - Money laundering or criminal investigations focused on individuals/organizations rather than crypto market impact
 - Kidnapping, ransom, or personal crime stories involving crypto
+- Any criminal case, criminal investigation (ongoing or concluded), police or authority warning about scams/fraud/criminal activity, arrest, indictment, charge, trial, sentencing, or crime-prevention advisory — even when crypto-related. This is a STRICT rule with exactly two exceptions that may PASS:
+  (1) a regulatory or law-enforcement action taken directly against a MAJOR crypto asset or MAJOR exchange as a company/protocol, with clear market impact;
+  (2) a hack or security breach of a MAJOR exchange or MAJOR crypto asset/protocol.
+  "Major" means top-tier only (e.g., Bitcoin, Ethereum or other top-20 assets; Binance, Coinbase or comparable top-tier exchanges). News about individual people (founders, executives, employees, influencers) NEVER qualifies for these exceptions, even if the person is connected to a major exchange. If you are not sure whether a crime-related headline qualifies for an exception, REJECT it — the default for crime-related content is rejection.
 
 TASK 2 — SCORE: For verified headlines, assign a sentiment score from -10 (extremely negative for crypto) to +10 (extremely positive for crypto). Consider the crypto market impact, not general tone.
 
@@ -466,43 +470,65 @@ with open(json_path, "w") as f:
     json.dump(headline_data, f, indent=2, default=str, ensure_ascii=False)
 print(f"Saved: {json_path}")
 
+# ---------- 6b) ZERO-DISPLAY-DAY GATE ----------
+# Nothing survived selection for display (every candidate rejected — more
+# likely with the crime-content rule — or a Claude API failure, which under
+# the old code published a content-free tweet). Write NO tweets txt and NO
+# post JSON: the workflow's post step then finds no *_post.json and skips
+# cleanly ("No post JSON found, skipping tweet"). The data JSON above is
+# still saved for diagnosis via the run artifact.
+if not final_all:
+    print("\n" + "="*50)
+    print("ZERO-DISPLAY DAY — no verified headlines survived for display.")
+    print("Skipping tweet build and post JSON; workflow will skip posting.")
+    print("="*50)
+    raise SystemExit(0)
+
 # ---------- 7) MAIN TWEET (image + summary) ----------
+def build_tweet_section(header, items, base_len, reserve):
+    """Build one tweet section (header + item lines) within the 280 budget.
+
+    Returns "" unless at least ONE item fits under the header, so a section
+    header can never be emitted without items beneath it (empty-section fix
+    approved 2026-07-14; published dangling-header example 07-14 05:36 AR).
+    Budget arithmetic is unchanged from the original inline loops.
+    """
+    section = header
+    added = 0
+    for a in items:
+        title = (a.get("title_tr") or a["title"])
+        if len(title) > 55:
+            title = title[:52] + "..."
+        line = f"  [{a['tone_score']:+d}] {title}\n"
+        if base_len + len(section) + len(line) + reserve > 280:
+            break
+        section += line
+        added += 1
+    return section if added > 0 else ""
+
+
 tweet_main = (
     f"Asiri Duygu Tasiyan Kripto Haberleri\n"
     f"{NOW_UTC.strftime('%d.%m.%Y %H:%M')} UTC\n\n"
 )
 
 if final_positive:
-    tweet_main += "[+] En Pozitif:\n"
-    for a in final_positive:
-        title = (a.get("title_tr") or a["title"])
-        if len(title) > 55:
-            title = title[:52] + "..."
-        line = f"  [{a['tone_score']:+d}] {title}\n"
-        if len(tweet_main) + len(line) + 80 > 280:
-            break
-        tweet_main += line
+    tweet_main += build_tweet_section("[+] En Pozitif:\n", final_positive,
+                                      len(tweet_main), 80)
 
 if final_negative:
-    neg_header = "\n[-] En Negatif:\n"
-    if len(tweet_main) + len(neg_header) + 80 < 280:
-        tweet_main += neg_header
-        for a in final_negative:
-            title = (a.get("title_tr") or a["title"])
-            if len(title) > 55:
-                title = title[:52] + "..."
-            line = f"  [{a['tone_score']:+d}] {title}\n"
-            if len(tweet_main) + len(line) + 60 > 280:
-                break
-            tweet_main += line
+    tweet_main += build_tweet_section("\n[-] En Negatif:\n", final_negative,
+                                      len(tweet_main), 60)
 
 tweet_main += (
     f"\nYatirim tavsiyesi degildir.\n"
     f"#KriptoHaber #Bitcoin"
 )
 
-if len(tweet_main) > 280:
-    tweet_main = tweet_main[:277] + "..."
+# Last-resort guard (unreachable given the reserves above): drop whole lines
+# from the end — never a mid-line cut, never "...".
+while len(tweet_main) > 280 and "\n" in tweet_main:
+    tweet_main = tweet_main.rsplit("\n", 1)[0]
 
 # ---------- 8) REPLY TWEETS (source links as thread) ----------
 reply_tweets = []
@@ -510,22 +536,28 @@ reply_tweets = []
 # Reply 1: Positive article links
 if final_positive:
     reply_pos = "[+] Pozitif Haberler:\n\n"
+    links_added = 0
     for i, a in enumerate(final_positive, 1):
         line = f"{i}. {a['url']}\n"
         if len(reply_pos) + len(line) > 275:
             break
         reply_pos += line
-    reply_tweets.append(reply_pos.strip())
+        links_added += 1
+    if links_added > 0:  # never a reply header with zero links
+        reply_tweets.append(reply_pos.strip())
 
 # Reply 2: Negative article links
 if final_negative:
     reply_neg = "[-] Negatif Haberler:\n\n"
+    links_added = 0
     for i, a in enumerate(final_negative, 1):
         line = f"{i}. {a['url']}\n"
         if len(reply_neg) + len(line) > 275:
             break
         reply_neg += line
-    reply_tweets.append(reply_neg.strip())
+        links_added += 1
+    if links_added > 0:  # never a reply header with zero links
+        reply_tweets.append(reply_neg.strip())
 
 # ---------- 9) PRINT RESULTS ----------
 print("\n" + "="*50)
