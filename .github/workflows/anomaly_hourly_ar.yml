@@ -30,6 +30,12 @@ jobs:
           else
             echo "No existing Arabic dedup log"
           fi
+          if [ -f data/anomaly_baseline_cache.json ]; then
+            cp data/anomaly_baseline_cache.json gdelt_bq_results/anomaly_baseline_cache.json
+            echo "Restored baseline cache (read-only for AR)"
+          else
+            echo "No baseline cache yet (AR will fall back to full query)"
+          fi
 
       - name: Run anomaly detection (Arabic)
         env:

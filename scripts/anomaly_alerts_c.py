@@ -192,10 +192,215 @@ HAVING n_current >= {MIN_ARTICLES_CURRENT} AND n_baseline >= {MIN_ARTICLES_BASEL
 ORDER BY mcap_rank
 """
 
-print(f"Running anomaly detection query for {len(SAFE_COINS) + len(AMBIGUOUS_COINS)} coins...")
-df = client.query(sql, location=REGION).to_dataframe()
+# ---------- 3a) SPLIT QUERIES (baseline cache, 2026-07-20) ----------
+# The combined query above is kept VERBATIM as the fallback path. Normal
+# operation splits it: a cheap CURRENT query (window partitions only) runs
+# every time; the 30-day BASELINE query runs only on cache refresh. Merging
+# in pandas reproduces the combined query's semantics (incl. both HAVING
+# conditions). CTE structure and coin patterns identical to the combined SQL.
+
+current_partition_start = window_start.strftime("%Y-%m-%d")
+baseline_partition_end = baseline_end.strftime("%Y-%m-%d")
+
+_CTE_BLOCK = """
+WITH g AS (
+  SELECT
+    SUBSTR(GKGRECORDID, 1, 14) AS record_ts,
+    LOWER(CONCAT(
+      COALESCE(V2Themes, ''), ' ',
+      COALESCE(V2Persons, ''), ' ',
+      COALESCE(V2Organizations, ''), ' ',
+      COALESCE(AllNames, ''), ' ',
+      COALESCE(Extras, ''), ' ',
+      COALESCE(DocumentIdentifier, '')
+    )) AS text_all,
+    CAST(SPLIT(V2Tone, ',')[OFFSET(0)] AS FLOAT64) AS tone_val
+  FROM `gdelt-bq.gdeltv2.gkg_partitioned`
+  WHERE _PARTITIONDATE BETWEEN DATE('{pstart}') AND DATE('{pend}')
+    AND V2Tone IS NOT NULL
+),
+safe_kw AS (
+  SELECT * FROM UNNEST([
+    {safe_rows}
+  ])
+),
+ambig_kw AS (
+  SELECT * FROM UNNEST([
+    {ambig_rows}
+  ])
+),
+-- SAFE coins: direct match
+safe_hits AS (
+  SELECT kw.label, kw.mcap_rank, g.tone_val, g.record_ts
+  FROM g
+  JOIN safe_kw kw ON REGEXP_CONTAINS(g.text_all, kw.pattern)
+  WHERE g.tone_val IS NOT NULL
+),
+-- AMBIGUOUS coins: require crypto co-occurrence
+ambig_hits AS (
+  SELECT kw.label, kw.mcap_rank, g.tone_val, g.record_ts
+  FROM g
+  JOIN ambig_kw kw ON REGEXP_CONTAINS(g.text_all, kw.pattern)
+  WHERE g.tone_val IS NOT NULL
+    AND REGEXP_CONTAINS(g.text_all, r'\\bcrypto\\b|\\bcryptocurrency\\b')
+),
+-- Combine
+all_hits AS (
+  SELECT * FROM safe_hits
+  UNION ALL
+  SELECT * FROM ambig_hits
+)
+"""
+
+current_sql = _CTE_BLOCK.format(
+    pstart=current_partition_start, pend=partition_end,
+    safe_rows=safe_rows, ambig_rows=ambig_rows,
+) + f"""
+SELECT
+  label,
+  mcap_rank,
+  COUNTIF(record_ts BETWEEN '{window_start_ts}' AND '{window_end_ts}') AS n_current,
+  AVG(IF(record_ts BETWEEN '{window_start_ts}' AND '{window_end_ts}', tone_val, NULL)) AS tone_current,
+  STDDEV(IF(record_ts BETWEEN '{window_start_ts}' AND '{window_end_ts}', tone_val, NULL)) AS std_current
+FROM all_hits
+GROUP BY label, mcap_rank
+HAVING n_current >= {MIN_ARTICLES_CURRENT}
+ORDER BY mcap_rank
+"""
+
+baseline_sql = _CTE_BLOCK.format(
+    pstart=partition_start, pend=baseline_partition_end,
+    safe_rows=safe_rows, ambig_rows=ambig_rows,
+) + f"""
+SELECT
+  label,
+  mcap_rank,
+  COUNTIF(record_ts BETWEEN '{baseline_start_ts}' AND '{baseline_end_ts}') AS n_baseline,
+  AVG(IF(record_ts BETWEEN '{baseline_start_ts}' AND '{baseline_end_ts}', tone_val, NULL)) AS tone_baseline,
+  STDDEV(IF(record_ts BETWEEN '{baseline_start_ts}' AND '{baseline_end_ts}', tone_val, NULL)) AS std_baseline
+FROM all_hits
+GROUP BY label, mcap_rank
+HAVING n_baseline >= 1
+ORDER BY mcap_rank
+"""
+
+# ---------- 3b) BASELINE CACHE + QUERY EXECUTION ----------
+CACHE_FILE = pathlib.Path("gdelt_bq_results") / "anomaly_baseline_cache.json"
+CACHE_FILE.parent.mkdir(exist_ok=True)
+REFRESH_HOURS = 20  # TR is the sole cache writer: refresh when older
+VERIFY_MODE = os.environ.get("BASELINE_VERIFY", "").lower() in ("1", "true")
+
+
+def run_query(q, label):
+    job = client.query(q, location=REGION)
+    out = job.to_dataframe()
+    gb = (getattr(job, "total_bytes_processed", None) or 0) / 1e9
+    print(f"[bq] {label}: {gb:.2f} GB processed, {len(out)} rows")
+    return out
+
+
+def load_baseline_cache():
+    """Returns ((cache_dict, age_hours), None) or (None, reason)."""
+    if not CACHE_FILE.exists():
+        return None, "missing"
+    try:
+        with open(CACHE_FILE) as f:
+            c = json.load(f)
+        age_h = (NOW_UTC - datetime.fromisoformat(c["refreshed_utc"])).total_seconds() / 3600.0
+        if not isinstance(c.get("coins"), list) or len(c["coins"]) == 0:
+            return None, "empty"
+        return (c, age_h), None
+    except Exception as e:
+        return None, f"unreadable ({type(e).__name__})"
+
+
+def merge_current_with_baseline(cur_df, cache):
+    """Reproduces the combined query's HAVING semantics: n_current >= MIN
+    enforced by current_sql; n_baseline >= MIN enforced here; inner join
+    drops coins failing either. Column order matches the combined SELECT."""
+    base_df = pd.DataFrame(cache["coins"])
+    base_df = base_df[base_df["n_baseline"] >= MIN_ARTICLES_BASELINE]
+    m = cur_df.merge(
+        base_df[["label", "n_baseline", "tone_baseline", "std_baseline"]],
+        on="label", how="inner",
+    )
+    return m.sort_values("mcap_rank").reset_index(drop=True)
+
+
+print(f"Running anomaly detection for {len(SAFE_COINS) + len(AMBIGUOUS_COINS)} coins...")
+loaded, load_err = load_baseline_cache()
+if loaded is not None:
+    cache, cache_age_h = loaded
+    print(f"Baseline cache: age {cache_age_h:.1f}h, {len(cache['coins'])} coins, "
+          f"refreshed {cache['refreshed_utc']}")
+else:
+    cache, cache_age_h = None, None
+    print(f"Baseline cache: {load_err}")
+
+query_mode = None
+try:
+    if cache is not None and cache_age_h < REFRESH_HOURS:
+        query_mode = "CACHED"
+        cur_df = run_query(current_sql, "current window")
+        df = merge_current_with_baseline(cur_df, cache)
+    else:
+        query_mode = "REFRESH"
+        print("Baseline cache REFRESH (missing, unusable, or age >= threshold)")
+        base_df = run_query(baseline_sql, "baseline 30d")
+        cur_df = run_query(current_sql, "current window")
+        new_cache = {
+            "refreshed_utc": NOW_UTC.isoformat(),
+            "baseline_start": baseline_start.isoformat(),
+            "baseline_end": baseline_end.isoformat(),
+            "coins": [
+                {
+                    "label": str(r["label"]),
+                    "mcap_rank": int(r["mcap_rank"]),
+                    "n_baseline": int(r["n_baseline"]),
+                    "tone_baseline": float(r["tone_baseline"]),
+                    "std_baseline": (float(r["std_baseline"])
+                                     if pd.notna(r["std_baseline"]) else None),
+                }
+                for _, r in base_df.iterrows()
+            ],
+        }
+        with open(CACHE_FILE, "w") as f:
+            json.dump(new_cache, f, indent=2)
+        print(f"Baseline cache written: {len(new_cache['coins'])} coins")
+        cache = new_cache
+        df = merge_current_with_baseline(cur_df, new_cache)
+except Exception as e:
+    query_mode = "FALLBACK"
+    print(f"FALLBACK to combined query ({type(e).__name__}: {e})")
+    df = run_query(sql, "combined (fallback)")
+
+print(f"Query mode: {query_mode}")
 print(f"Coins with enough data: {len(df)}")
 print(df[["label", "n_current", "tone_current", "n_baseline", "tone_baseline"]].to_string(index=False))
+
+if VERIFY_MODE:
+    print()
+    print("=" * 60)
+    print("BASELINE VERIFY MODE - cached vs freshly computed")
+    print("=" * 60)
+    fresh = run_query(sql, "combined (verify reference)")
+    if query_mode in ("CACHED", "REFRESH") and cache is not None:
+        base_map = {c["label"]: c for c in cache["coins"]}
+        for _, r in fresh.iterrows():
+            cb = base_map.get(r["label"])
+            if cb is None:
+                print(f"  {r['label']:20s} NOT IN CACHE | fresh n={int(r['n_baseline'])} "
+                      f"tone={r['tone_baseline']:+.3f}")
+            else:
+                dn = int(r["n_baseline"]) - int(cb["n_baseline"])
+                dt = float(r["tone_baseline"]) - float(cb["tone_baseline"])
+                print(f"  {r['label']:20s} cached n={int(cb['n_baseline']):6d} "
+                      f"tone={float(cb['tone_baseline']):+.3f} | "
+                      f"fresh n={int(r['n_baseline']):6d} tone={r['tone_baseline']:+.3f} | "
+                      f"dn={dn:+d} dtone={dt:+.3f}")
+    else:
+        print(f"  (mode={query_mode}: no cache in play; fresh reference printed above)")
+
 
 # ---------- 4) DETECT ANOMALIES ----------
 df["tone_delta"] = df["tone_current"] - df["tone_baseline"]

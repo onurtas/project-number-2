@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 */6 * * *'  # every 6 hours
   workflow_dispatch:
+    inputs:
+      verify_baseline:
+        description: "Print cached vs freshly computed baseline comparison"
+        required: false
+        default: "false"
 
 permissions:
   contents: write
@@ -30,12 +35,37 @@ jobs:
           else
             echo "No existing dedup log"
           fi
+          if [ -f data/anomaly_baseline_cache.json ]; then
+            cp data/anomaly_baseline_cache.json gdelt_bq_results/anomaly_baseline_cache.json
+            echo "Restored baseline cache"
+          else
+            echo "No existing baseline cache"
+          fi
 
       - name: Run anomaly detection
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
+          BASELINE_VERIFY: ${{ github.event.inputs.verify_baseline || 'false' }}
         run: python scripts/anomaly_alerts_c.py
+
+      - name: Save baseline cache (before posting — cache validity is independent of post success)
+        run: |
+          mkdir -p data
+          if [ -f gdelt_bq_results/anomaly_baseline_cache.json ]; then
+            if ! cmp -s gdelt_bq_results/anomaly_baseline_cache.json data/anomaly_baseline_cache.json; then
+              cp gdelt_bq_results/anomaly_baseline_cache.json data/anomaly_baseline_cache.json
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git add data/anomaly_baseline_cache.json
+              git diff --cached --quiet || git commit -m "Update anomaly baseline cache [skip ci]"
+              git pull --rebase origin main
+              git push
+              echo "Baseline cache committed"
+            else
+              echo "Baseline cache unchanged"
+            fi
+          fi
 
       - name: Post to X (only if anomalies found)
         env:
