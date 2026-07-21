@@ -421,34 +421,14 @@ anomalies = df[df["is_anomaly"]].copy()
 # Sort by market cap rank (highest cap = lowest rank number = highest priority)
 anomalies = anomalies.sort_values("mcap_rank")
 
-# Cap at MAX_ALERTS_PER_DAY
-anomalies = anomalies.head(MAX_ALERTS_PER_DAY)
+n_detected = len(anomalies)
 
-print(f"\n{'='*60}")
-print(f"ANOMALY DETECTION RESULTS")
-print(f"{'='*60}")
-print(f"Coins analyzed: {len(df)}")
-print(f"Anomalies detected: {len(anomalies)}")
-
-if len(anomalies) > 0:
-    print(f"\n🚨 ALERTS (max {MAX_ALERTS_PER_DAY}):")
-    for _, row in anomalies.iterrows():
-        direction = "📈 YÜKSELİŞ" if row["direction"] == "positive" else "📉 DÜŞÜŞ"
-        print(f"  {direction} {row['label']}: {row['tone_current']:+.2f} vs {row['tone_baseline']:+.2f} "
-              f"(Δ{row['pct_change']:+.0%}) | {int(row['n_current'])} haber / {WINDOW_HOURS}sa")
-else:
-    print("\n  ✅ Anomali tespit edilmedi. Tüm coin'ler normal aralıkta.")
-
-# Print all coins status for reference
-print(f"\nAll coins with data:")
-for _, row in df.iterrows():
-    flag = "🚨" if row["is_anomaly"] else "  "
-    print(f"  {flag} {row['label']:20s}  current: {row['tone_current']:+.2f} ({int(row['n_current']):4d})  "
-          f"baseline: {row['tone_baseline']:+.2f} ({int(row['n_baseline']):5d})  Δ{row['pct_change']:+.0%}")
-
-# ---------- 5) DEDUP LOG (simulated for Colab) ----------
-# In production, this would read/write to Firestore
-# For Colab testing, we use a local JSON file
+# ---------- 5) DEDUP FILTER (moved before selection, 2026-07-22) ----------
+# Dedup now runs BEFORE the MAX_ALERTS_PER_DAY cap: previously the mcap
+# top-4 was selected first and dedup then removed rows from it, so fresh
+# lower-mcap anomalies were dropped while alert slots went unused
+# (live examples 2026-07-20/21). The log is READ here for filtering;
+# selected coins are recorded and the file saved in section 5b below.
 DEDUP_FILE = pathlib.Path("gdelt_bq_results") / "anomaly_dedup_log.json"
 DEDUP_FILE.parent.mkdir(exist_ok=True)
 
@@ -459,17 +439,58 @@ if DEDUP_FILE.exists():
 else:
     dedup_log = {}
 
-# Filter out recently alerted coins
 dedup_cutoff = (NOW_UTC - timedelta(hours=DEDUP_HOURS)).isoformat()
-final_anomalies = []
+
+print(f"\n{'='*60}")
+print(f"ANOMALY DETECTION RESULTS")
+print(f"{'='*60}")
+print(f"Coins analyzed: {len(df)}")
+print(f"Anomalies detected: {n_detected}")
+
+# Filter out recently alerted coins (skip lines print before the alert list)
+_keep = []
 for _, row in anomalies.iterrows():
     coin = row["label"]
     last_alert = dedup_log.get(coin, None)
     if last_alert and last_alert > dedup_cutoff:
         print(f"  ⏭️  {coin} — already alerted within {DEDUP_HOURS}h, skipping")
+        _keep.append(False)
     else:
-        final_anomalies.append(row)
-        dedup_log[coin] = NOW_UTC.isoformat()
+        _keep.append(True)
+if _keep:
+    anomalies = anomalies[_keep]
+
+# Cap at MAX_ALERTS_PER_DAY — applied AFTER dedup so slots go only to
+# coins that can actually post
+anomalies = anomalies.head(MAX_ALERTS_PER_DAY)
+
+if len(anomalies) > 0:
+    print(f"\n🚨 ALERTS (max {MAX_ALERTS_PER_DAY}):")
+    for _, row in anomalies.iterrows():
+        direction = "📈 YÜKSELİŞ" if row["direction"] == "positive" else "📉 DÜŞÜŞ"
+        print(f"  {direction} {row['label']}: {row['tone_current']:+.2f} vs {row['tone_baseline']:+.2f} "
+              f"(Δ{row['pct_change']:+.0%}) | {int(row['n_current'])} haber / {WINDOW_HOURS}sa")
+elif n_detected > 0:
+    print("\n  ⏭️  Tüm tespit edilen anomaliler son 24 saatte zaten duyuruldu — yeni uyarı yok.")
+else:
+    print("\n  ✅ Anomali tespit edilmedi. Tüm coin'ler normal aralıkta.")
+
+# Print all coins status for reference
+print(f"\nAll coins with data:")
+for _, row in df.iterrows():
+    flag = "🚨" if row["is_anomaly"] else "  "
+    print(f"  {flag} {row['label']:20s}  current: {row['tone_current']:+.2f} ({int(row['n_current']):4d})  "
+          f"baseline: {row['tone_baseline']:+.2f} ({int(row['n_baseline']):5d})  Δ{row['pct_change']:+.0%}")
+
+# ---------- 5b) RECORD SELECTED ALERTS IN DEDUP LOG ----------
+# The dedup FILTER ran in section 5 above (before selection). Here the
+# finally selected coins — and only those — are recorded and the log saved.
+# Coins that passed dedup but lost the mcap cut are NOT recorded, so they
+# remain eligible for the next run.
+final_anomalies = []
+for _, row in anomalies.iterrows():
+    final_anomalies.append(row)
+    dedup_log[row["label"]] = NOW_UTC.isoformat()
 
 # Save updated dedup log
 with open(DEDUP_FILE, "w") as f:
@@ -572,7 +593,7 @@ alert_data = {
     "baseline_days": BASELINE_DAYS,
     "threshold": ANOMALY_THRESHOLD,
     "coins_analyzed": len(df),
-    "anomalies_detected": len(anomalies),
+    "anomalies_detected": n_detected,
     "alerts_after_dedup": len(final_anomalies),
     "alerts": [
         {
