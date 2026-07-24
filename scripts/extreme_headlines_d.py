@@ -522,12 +522,12 @@ def first_item_line_len(items):
 
 
 tweet_main = (
-    f"Asiri Duygu Tasiyan Kripto Haberleri\n"
+    f"Aşırı Duygu Taşıyan Kripto Haberleri\n"
     f"{NOW_UTC.strftime('%d.%m.%Y %H:%M')} UTC\n\n"
 )
 
 tweet_tail = (
-    f"\nYatirim tavsiyesi degildir.\n"
+    f"\nYatırım tavsiyesi değildir.\n"
     f"#KriptoHaber #Bitcoin"
 )
 neg_header = "\n[-] En Negatif:\n"
