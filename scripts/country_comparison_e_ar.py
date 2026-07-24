@@ -99,24 +99,60 @@ FIXED_MARKETS = {
 }
 
 # For dynamic top-10: need FIPS→Turkish name mapping for common countries
+# FIPS 10-4 -> Arabic country names, comprehensive coverage
+# (2026-07-23: corrected NI/NG, BG/BU, EZ, PO; VE added; TR and AR
+# maps unified to identical key sets. FIPS diverges from ISO:
+# AS=Avustralya, AU=Avusturya, SW=Isvec, SZ=Isvicre, SP=Ispanya,
+# NI=Nijerya, NG=Nijer, BG=Banglades, BU=Bulgaristan, EZ=Cekya,
+# PO=Portekiz, MU=Umman, MG=Mogolistan, SG=Senegal, SN=Singapur.)
 FIPS_TO_AR = {
-    "US": "الولايات المتحدة", "KS": "كوريا الجنوبية", "JA": "اليابان", "CH": "الصين",
-    "UK": "بريطانيا", "HK": "هونغ كونغ", "SN": "سنغافورة", "AE": "الإمارات",
-    "IN": "الهند", "TU": "تركيا", "GM": "ألمانيا", "FR": "فرنسا",
-    "AS": "أستراليا", "CA": "كندا", "BR": "البرازيل", "NL": "هولندا",
-    "RS": "روسيا", "IT": "إيطاليا", "SP": "إسبانيا", "SW": "السويد",
-    "EI": "أيرلندا", "IS": "إسرائيل", "DA": "الدنمارك", "NO": "النرويج",
-    "PK": "باكستان", "NG": "نيجيريا", "SF": "جنوب أفريقيا", "MY": "ماليزيا",
-    "TH": "تايلاند", "ID": "إندونيسيا", "PH": "الفلبين", "VM": "فيتنام",
-    "TW": "تايوان", "MX": "المكسيك", "AR": "الأرجنتين", "CO": "كولومبيا",
-    "PL": "بولندا", "FI": "فنلندا", "SZ": "سويسرا", "AU": "النمسا",
-    "BE": "بلجيكا", "NZ": "نيوزيلندا", "KE": "كينيا", "GH": "غانا",
-    "EG": "مصر", "SA": "السعودية",
-    "RP": "الفلبين", "UP": "أوكرانيا",
-    "HU": "المجر", "GR": "اليونان", "CZ": "التشيك", "PT": "البرتغال",
-    "RO": "رومانيا", "BG": "بلغاريا", "HR": "كرواتيا", "LY": "ليبيا",
-    "MO": "المغرب", "TS": "تونس", "IZ": "العراق", "IR": "إيران",
-    "QA": "قطر", "BA": "البحرين", "KU": "الكويت", "MU": "عُمان",
+    "US": "الولايات المتحدة", "KS": "كوريا الجنوبية", "JA": "اليابان",
+    "CH": "الصين", "UK": "بريطانيا", "HK": "هونغ كونغ",
+    "SN": "سنغافورة", "AE": "الإمارات", "IN": "الهند",
+    "TU": "تركيا", "GM": "ألمانيا", "FR": "فرنسا",
+    "AS": "أستراليا", "CA": "كندا", "BR": "البرازيل",
+    "NL": "هولندا", "RS": "روسيا", "IT": "إيطاليا",
+    "SP": "إسبانيا", "SW": "السويد", "EI": "أيرلندا",
+    "IS": "إسرائيل", "DA": "الدنمارك", "NO": "النرويج",
+    "PK": "باكستان", "SF": "جنوب أفريقيا", "MY": "ماليزيا",
+    "TH": "تايلاند", "ID": "إندونيسيا", "PH": "الفلبين",
+    "RP": "الفلبين", "VM": "فيتنام", "TW": "تايوان",
+    "MX": "المكسيك", "AR": "الأرجنتين", "CO": "كولومبيا",
+    "PL": "بولندا", "FI": "فنلندا", "SZ": "سويسرا",
+    "AU": "النمسا", "BE": "بلجيكا", "NZ": "نيوزيلندا",
+    "KE": "كينيا", "GH": "غانا", "EG": "مصر",
+    "SA": "السعودية", "UP": "أوكرانيا", "NI": "نيجيريا",
+    "NG": "النيجر", "BG": "بنغلاديش", "BU": "بلغاريا",
+    "EZ": "التشيك", "PO": "البرتغال", "VE": "فنزويلا",
+    "HU": "المجر", "GR": "اليونان", "RO": "رومانيا",
+    "HR": "كرواتيا", "LY": "ليبيا", "MO": "المغرب",
+    "TS": "تونس", "IZ": "العراق", "IR": "إيران",
+    "QA": "قطر", "BA": "البحرين", "KU": "الكويت",
+    "MU": "عُمان", "LO": "سلوفاكيا", "SI": "سلوفينيا",
+    "BK": "البوسنة والهرسك", "RI": "صربيا", "MJ": "الجبل الأسود",
+    "MK": "مقدونيا الشمالية", "AL": "ألبانيا", "LH": "ليتوانيا",
+    "LG": "لاتفيا", "EN": "إستونيا", "IC": "آيسلندا",
+    "LU": "لوكسمبورغ", "MT": "مالطا", "CY": "قبرص",
+    "MD": "مولدوفا", "BO": "بيلاروسيا", "GG": "جورجيا",
+    "AM": "أرمينيا", "AJ": "أذربيجان", "KZ": "كازاخستان",
+    "UZ": "أوزبكستان", "KG": "قرغيزستان", "TX": "تركمانستان",
+    "TI": "طاجيكستان", "AF": "أفغانستان", "NP": "نيبال",
+    "CE": "سريلانكا", "BM": "ميانمار", "CB": "كمبوديا",
+    "LA": "لاوس", "BX": "بروناي", "MV": "المالديف",
+    "MG": "منغوليا", "KN": "كوريا الشمالية", "MC": "ماكاو",
+    "JO": "الأردن", "LE": "لبنان", "SY": "سوريا",
+    "YM": "اليمن", "CI": "تشيلي", "PE": "بيرو",
+    "EC": "الإكوادور", "UY": "الأوروغواي", "PA": "الباراغواي",
+    "BL": "بوليفيا", "PM": "بنما", "CS": "كوستاريكا",
+    "GT": "غواتيمالا", "HO": "هندوراس", "ES": "السلفادور",
+    "NU": "نيكاراغوا", "CU": "كوبا", "HA": "هايتي",
+    "DR": "جمهورية الدومينيكان", "JM": "جامايكا", "TD": "ترينيداد وتوباغو",
+    "AG": "الجزائر", "SU": "السودان", "ET": "إثيوبيا",
+    "UG": "أوغندا", "TZ": "تنزانيا", "RW": "رواندا",
+    "IV": "ساحل العاج", "SG": "السنغال", "CM": "الكاميرون",
+    "ZI": "زيمبابوي", "ZA": "زامبيا", "WA": "ناميبيا",
+    "BC": "بوتسوانا", "MZ": "موزمبيق", "AO": "أنغولا",
+    "MA": "مدغشقر",
 }
 
 # ---------- 4) 20 GAUGE KEYWORDS (same as Type A) ----------
@@ -213,6 +249,9 @@ print(df.head(30).to_string(index=False))
 # Map FIPS codes to Turkish names
 df["country_tr"] = df["countrycode"].map(FIPS_TO_AR)
 df["country_tr"] = df["country_tr"].fillna(df["countrycode"])  # fallback to code
+_unmapped = sorted(set(df.loc[~df["countrycode"].isin(FIPS_TO_AR), "countrycode"]))
+if _unmapped:
+    print(f"[chart] Unmapped FIPS code(s), displayed as raw code: {', '.join(_unmapped)}")
 
 # View 1: Fixed 10 markets (only those with data)
 fixed_codes = list(FIXED_MARKETS.keys())
@@ -274,15 +313,22 @@ if n1 > 0:
     for bar, (_, row) in zip(bars1, df_fixed.iterrows()):
         n = int(row["n_articles"])
         t = row["avg_tone"]
-        # Volume at end of bar
-        ax1.text(bar.get_width() + max(volumes1) * 0.02, bar.get_y() + bar.get_height()/2,
-                f"{n}",
-                ha="left", va="center", fontsize=9, fontweight="bold", color="#374151")
-        # Tone inside bar (if wide enough)
+        # Wide bar: volume outside, tone inside (rendering unchanged).
+        # Narrow bar (2026-07-23): tone moves OUTSIDE next to the count,
+        # same "n  (+t)" format as the dynamic panel — previously narrow
+        # bars silently lost their tone badge.
         if bar.get_width() > max(max(volumes1) * 0.12, 1) and pd.notna(t):
+            ax1.text(bar.get_width() + max(volumes1) * 0.02, bar.get_y() + bar.get_height()/2,
+                    f"{n}",
+                    ha="left", va="center", fontsize=9, fontweight="bold", color="#374151")
             ax1.text(bar.get_width() - max(volumes1) * 0.02, bar.get_y() + bar.get_height()/2,
                     f"{t:+.1f}",
                     ha="right", va="center", fontsize=8, color="white", fontweight="bold", alpha=0.9)
+        else:
+            label1 = f"{n}  ({t:+.1f})" if pd.notna(t) else f"{n}"
+            ax1.text(bar.get_width() + max(volumes1) * 0.02, bar.get_y() + bar.get_height()/2,
+                    label1,
+                    ha="left", va="center", fontsize=9, fontweight="bold", color="#374151")
 
     ax1.set_yticks(y1)
     ax1.set_yticklabels([ar(x) for x in df_fixed["country_tr"]], fontsize=11, fontweight="bold", color="#111827")
@@ -336,6 +382,14 @@ if len(df_dynamic) > 0:
 
     ax2.set_title(ar("أسواق ديناميكية أخرى"),
                   fontsize=13, fontweight="bold", color="#111827", pad=12)
+
+    # Independent-axes note (2026-07-23, Option B): panels use independent
+    # x-scales, so cross-panel bar lengths are not comparable. Shown only
+    # when both panels have bars.
+    if n1 > 0:
+        ax2.text(1.0, 1.03, ar("المقاييس مستقلة بين اللوحتين"),
+                 transform=ax2.transAxes, ha="right", va="bottom",
+                 fontsize=6.5, color="#9CA3AF")
 else:
     ax2.text(0.5, 0.5, ar("لا توجد بيانات كافية"), ha="center", va="center",
              fontsize=14, color="#9CA3AF", transform=ax2.transAxes)

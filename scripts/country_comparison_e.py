@@ -98,20 +98,60 @@ FIXED_MARKETS = {
 }
 
 # For dynamic top-10: need FIPS→Turkish name mapping for common countries
+# FIPS 10-4 -> Turkish country names, comprehensive coverage
+# (2026-07-23: corrected NI/NG, BG/BU, EZ, PO; VE added; TR and AR
+# maps unified to identical key sets. FIPS diverges from ISO:
+# AS=Avustralya, AU=Avusturya, SW=Isvec, SZ=Isvicre, SP=Ispanya,
+# NI=Nijerya, NG=Nijer, BG=Banglades, BU=Bulgaristan, EZ=Cekya,
+# PO=Portekiz, MU=Umman, MG=Mogolistan, SG=Senegal, SN=Singapur.)
 FIPS_TO_TR = {
-    "US": "ABD", "KS": "Güney Kore", "JA": "Japonya", "CH": "Çin",
-    "UK": "İngiltere", "HK": "Hong Kong", "SN": "Singapur", "AE": "BAE",
-    "IN": "Hindistan", "TU": "Türkiye", "GM": "Almanya", "FR": "Fransa",
-    "AS": "Avustralya", "CA": "Kanada", "BR": "Brezilya", "NL": "Hollanda",
-    "RS": "Rusya", "IT": "İtalya", "SP": "İspanya", "SW": "İsveç",
-    "EI": "İrlanda", "IS": "İsrail", "DA": "Danimarka", "NO": "Norveç",
-    "PK": "Pakistan", "NG": "Nijerya", "SF": "Güney Afrika", "MY": "Malezya",
-    "TH": "Tayland", "ID": "Endonezya", "PH": "Filipinler", "VM": "Vietnam",
-    "TW": "Tayvan", "MX": "Meksika", "AR": "Arjantin", "CO": "Kolombiya",
-    "PL": "Polonya", "FI": "Finlandiya", "SZ": "İsviçre", "AU": "Avusturya",
-    "BE": "Belçika", "NZ": "Yeni Zelanda", "KE": "Kenya", "GH": "Gana",
-    "EG": "Mısır", "SA": "Suudi Arabistan",
-    "RP": "Filipinler", "UP": "Ukrayna",
+    "US": "ABD", "KS": "Güney Kore", "JA": "Japonya",
+    "CH": "Çin", "UK": "İngiltere", "HK": "Hong Kong",
+    "SN": "Singapur", "AE": "BAE", "IN": "Hindistan",
+    "TU": "Türkiye", "GM": "Almanya", "FR": "Fransa",
+    "AS": "Avustralya", "CA": "Kanada", "BR": "Brezilya",
+    "NL": "Hollanda", "RS": "Rusya", "IT": "İtalya",
+    "SP": "İspanya", "SW": "İsveç", "EI": "İrlanda",
+    "IS": "İsrail", "DA": "Danimarka", "NO": "Norveç",
+    "PK": "Pakistan", "SF": "Güney Afrika", "MY": "Malezya",
+    "TH": "Tayland", "ID": "Endonezya", "PH": "Filipinler",
+    "RP": "Filipinler", "VM": "Vietnam", "TW": "Tayvan",
+    "MX": "Meksika", "AR": "Arjantin", "CO": "Kolombiya",
+    "PL": "Polonya", "FI": "Finlandiya", "SZ": "İsviçre",
+    "AU": "Avusturya", "BE": "Belçika", "NZ": "Yeni Zelanda",
+    "KE": "Kenya", "GH": "Gana", "EG": "Mısır",
+    "SA": "Suudi Arabistan", "UP": "Ukrayna", "NI": "Nijerya",
+    "NG": "Nijer", "BG": "Bangladeş", "BU": "Bulgaristan",
+    "EZ": "Çekya", "PO": "Portekiz", "VE": "Venezuela",
+    "HU": "Macaristan", "GR": "Yunanistan", "RO": "Romanya",
+    "HR": "Hırvatistan", "LY": "Libya", "MO": "Fas",
+    "TS": "Tunus", "IZ": "Irak", "IR": "İran",
+    "QA": "Katar", "BA": "Bahreyn", "KU": "Kuveyt",
+    "MU": "Umman", "LO": "Slovakya", "SI": "Slovenya",
+    "BK": "Bosna-Hersek", "RI": "Sırbistan", "MJ": "Karadağ",
+    "MK": "Kuzey Makedonya", "AL": "Arnavutluk", "LH": "Litvanya",
+    "LG": "Letonya", "EN": "Estonya", "IC": "İzlanda",
+    "LU": "Lüksemburg", "MT": "Malta", "CY": "Kıbrıs",
+    "MD": "Moldova", "BO": "Belarus", "GG": "Gürcistan",
+    "AM": "Ermenistan", "AJ": "Azerbaycan", "KZ": "Kazakistan",
+    "UZ": "Özbekistan", "KG": "Kırgızistan", "TX": "Türkmenistan",
+    "TI": "Tacikistan", "AF": "Afganistan", "NP": "Nepal",
+    "CE": "Sri Lanka", "BM": "Myanmar", "CB": "Kamboçya",
+    "LA": "Laos", "BX": "Brunei", "MV": "Maldivler",
+    "MG": "Moğolistan", "KN": "Kuzey Kore", "MC": "Makao",
+    "JO": "Ürdün", "LE": "Lübnan", "SY": "Suriye",
+    "YM": "Yemen", "CI": "Şili", "PE": "Peru",
+    "EC": "Ekvador", "UY": "Uruguay", "PA": "Paraguay",
+    "BL": "Bolivya", "PM": "Panama", "CS": "Kosta Rika",
+    "GT": "Guatemala", "HO": "Honduras", "ES": "El Salvador",
+    "NU": "Nikaragua", "CU": "Küba", "HA": "Haiti",
+    "DR": "Dominik Cumhuriyeti", "JM": "Jamaika", "TD": "Trinidad ve Tobago",
+    "AG": "Cezayir", "SU": "Sudan", "ET": "Etiyopya",
+    "UG": "Uganda", "TZ": "Tanzanya", "RW": "Ruanda",
+    "IV": "Fildişi Sahili", "SG": "Senegal", "CM": "Kamerun",
+    "ZI": "Zimbabve", "ZA": "Zambiya", "WA": "Namibya",
+    "BC": "Botsvana", "MZ": "Mozambik", "AO": "Angola",
+    "MA": "Madagaskar",
 }
 
 # ---------- 4) 20 GAUGE KEYWORDS (same as Type A) ----------
@@ -208,6 +248,9 @@ print(df.head(30).to_string(index=False))
 # Map FIPS codes to Turkish names
 df["country_tr"] = df["countrycode"].map(FIPS_TO_TR)
 df["country_tr"] = df["country_tr"].fillna(df["countrycode"])  # fallback to code
+_unmapped = sorted(set(df.loc[~df["countrycode"].isin(FIPS_TO_TR), "countrycode"]))
+if _unmapped:
+    print(f"[chart] Unmapped FIPS code(s), displayed as raw code: {', '.join(_unmapped)}")
 
 # View 1: Fixed 10 markets (only those with data)
 fixed_codes = list(FIXED_MARKETS.keys())
@@ -269,15 +312,22 @@ if n1 > 0:
     for bar, (_, row) in zip(bars1, df_fixed.iterrows()):
         n = int(row["n_articles"])
         t = row["avg_tone"]
-        # Volume at end of bar
-        ax1.text(bar.get_width() + max(volumes1) * 0.02, bar.get_y() + bar.get_height()/2,
-                f"{n}",
-                ha="left", va="center", fontsize=9, fontweight="bold", color="#374151")
-        # Tone inside bar (if wide enough)
+        # Wide bar: volume outside, tone inside (rendering unchanged).
+        # Narrow bar (2026-07-23): tone moves OUTSIDE next to the count,
+        # same "n  (+t)" format as the dynamic panel — previously narrow
+        # bars silently lost their tone badge.
         if bar.get_width() > max(max(volumes1) * 0.12, 1) and pd.notna(t):
+            ax1.text(bar.get_width() + max(volumes1) * 0.02, bar.get_y() + bar.get_height()/2,
+                    f"{n}",
+                    ha="left", va="center", fontsize=9, fontweight="bold", color="#374151")
             ax1.text(bar.get_width() - max(volumes1) * 0.02, bar.get_y() + bar.get_height()/2,
                     f"{t:+.1f}",
                     ha="right", va="center", fontsize=8, color="white", fontweight="bold", alpha=0.9)
+        else:
+            label1 = f"{n}  ({t:+.1f})" if pd.notna(t) else f"{n}"
+            ax1.text(bar.get_width() + max(volumes1) * 0.02, bar.get_y() + bar.get_height()/2,
+                    label1,
+                    ha="left", va="center", fontsize=9, fontweight="bold", color="#374151")
 
     ax1.set_yticks(y1)
     ax1.set_yticklabels(df_fixed["country_tr"], fontsize=11, fontweight="bold", color="#111827")
@@ -331,6 +381,14 @@ if len(df_dynamic) > 0:
 
     ax2.set_title("Diğer Aktif Ülkeler",
                   fontsize=13, fontweight="bold", color="#111827", pad=12)
+
+    # Independent-axes note (2026-07-23, Option B): panels use independent
+    # x-scales, so cross-panel bar lengths are not comparable. Shown only
+    # when both panels have bars.
+    if n1 > 0:
+        ax2.text(1.0, 1.03, "Paneller bağımsız ölçeklidir",
+                 transform=ax2.transAxes, ha="right", va="bottom",
+                 fontsize=6.5, color="#9CA3AF", style="italic")
 else:
     ax2.text(0.5, 0.5, "Yeterli veri yok", ha="center", va="center",
              fontsize=14, color="#9CA3AF", transform=ax2.transAxes)
