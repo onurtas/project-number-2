@@ -506,21 +506,28 @@ if len(final_anomalies) == 0:
     print("\nAnomali yok — görsel oluşturulmadı.")
 else:
     n_alerts = len(final_anomalies)
-    fig_height = max(5, 1.5 + n_alerts * 2.2)
+    # Physical layout bands (inches): card density is uniform at any alert
+    # count. ITEM_IN=2.0 preserves the pre-change 4-alert proportions;
+    # sparse (1-2 alert) charts compress instead of leaving blank space.
+    TITLE_IN = 1.65   # top margin + title band
+    ITEM_IN = 2.00    # per-alert band (name + stats + separator)
+    TAIL_IN = 0.85    # summary + footer band
+    fig_height = TITLE_IN + n_alerts * ITEM_IN + TAIL_IN
     fig, ax = plt.subplots(figsize=(10, fig_height))
     ax.axis("off")
 
     # Title
-    ax.text(0.5, 0.96, "UYARI — Kripto Duygu Anomalisi Tespit Edildi",
+    ax.text(0.5, 1 - 0.41 / fig_height, "UYARI — Kripto Duygu Anomalisi Tespit Edildi",
             transform=ax.transAxes, ha="center", va="top",
             fontsize=17, fontweight="bold", color="#DC2626")
 
     # (Timestamp subtitle removed 2026-07-18: housekeeping info, not
     # follower-facing; the tweet text carries the date and window.)
 
-    y = 0.84
-    item_height = 0.78 / max(n_alerts, 1)
-    item_height = min(item_height, 0.20)
+    y = 1 - TITLE_IN / fig_height
+    item_height = ITEM_IN / fig_height
+    stats_dy = 0.62 / fig_height
+    sep_dy = 1.03 / fig_height
 
     for row in final_anomalies:
         is_positive = row["direction"] == "positive"
@@ -546,12 +553,12 @@ else:
             f"30 Gün Ort: {row['tone_baseline']:+.2f}  |  "
             f"{int(row['n_current'])} haber ({WINDOW_HOURS}sa)"
         )
-        ax.text(0.05, y - 0.06, stats_text,
+        ax.text(0.05, y - stats_dy, stats_text,
                 transform=ax.transAxes, ha="left", va="top",
                 fontsize=9, color="#374151")
 
         # Separator line
-        sep_y = y - 0.10
+        sep_y = y - sep_dy
         ax.plot([0.05, 0.95], [sep_y, sep_y], color="#E5E7EB", linewidth=0.5,
                 transform=ax.transAxes, clip_on=False)
 
@@ -566,12 +573,12 @@ else:
         f"({n_up} yükseliş, {n_down} düşüş). "
         f"En büyük değişim: {biggest['label']} (Δ ton {biggest['tone_delta']:+.2f})."
     )
-    ax.text(0.5, max(y - 0.02, 0.08), summary,
+    ax.text(0.5, 0.80 / fig_height, summary,
             transform=ax.transAxes, ha="center", va="top",
             fontsize=7.5, color="#6B7280", style="italic")
 
     # Footer
-    footer_y = max(y - 0.05, 0.02)
+    footer_y = 0.22 / fig_height
     ax.text(0.5, footer_y,
             f"Yatırım tavsiyesi değildir.",
             transform=ax.transAxes, ha="center", va="top",

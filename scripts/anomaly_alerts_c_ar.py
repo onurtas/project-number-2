@@ -461,21 +461,28 @@ if len(final_anomalies) == 0:
     print("\nAnomali yok — görsel oluşturulmadı.")
 else:
     n_alerts = len(final_anomalies)
-    fig_height = max(5, 1.5 + n_alerts * 2.2)
+    # Physical layout bands (inches): card density is uniform at any alert
+    # count. ITEM_IN=2.0 preserves the pre-change 4-alert proportions;
+    # sparse (1-2 alert) charts compress instead of leaving blank space.
+    TITLE_IN = 1.65   # top margin + title band
+    ITEM_IN = 2.00    # per-alert band (name + stats + separator)
+    TAIL_IN = 0.85    # summary + footer band
+    fig_height = TITLE_IN + n_alerts * ITEM_IN + TAIL_IN
     fig, ax = plt.subplots(figsize=(10, fig_height))
     ax.axis("off")
 
     # Title
-    ax.text(0.5, 0.96, ar("تنبيه — اكتشاف شذوذ في معنويات العملات الرقمية"),
+    ax.text(0.5, 1 - 0.41 / fig_height, ar("تنبيه — اكتشاف شذوذ في معنويات العملات الرقمية"),
             transform=ax.transAxes, ha="center", va="top",
             fontsize=17, fontweight="bold", color="#DC2626")
 
     # (Timestamp subtitle removed 2026-07-18: housekeeping info, not
     # follower-facing; the tweet text carries the date and window.)
 
-    y = 0.84
-    item_height = 0.78 / max(n_alerts, 1)
-    item_height = min(item_height, 0.20)
+    y = 1 - TITLE_IN / fig_height
+    item_height = ITEM_IN / fig_height
+    stats_dy = 0.62 / fig_height
+    sep_dy = 1.03 / fig_height
 
     for row in final_anomalies:
         is_positive = row["direction"] == "positive"
@@ -501,19 +508,39 @@ else:
             f"{ar('متوسط 30 يوم')}: {row['tone_baseline']:+.2f}  |  "
             f"{int(row['n_current'])} {ar('خبر')} ({WINDOW_HOURS}h)"
         )
-        ax.text(0.05, y - 0.06, stats_text,
+        ax.text(0.05, y - stats_dy, stats_text,
                 transform=ax.transAxes, ha="left", va="top",
                 fontsize=9, color="#374151")
 
         # Separator line
-        sep_y = y - 0.10
+        sep_y = y - sep_dy
         ax.plot([0.05, 0.95], [sep_y, sep_y], color="#E5E7EB", linewidth=0.5,
                 transform=ax.transAxes, clip_on=False)
 
         y -= item_height
 
+    # Auto-generated summary (added 2026-07-23: mirrors the TR chart's
+    # summary line; non-italic — DejaVu Oblique has no Arabic glyphs)
+    biggest = max(final_anomalies, key=lambda r: abs(r["tone_delta"]))
+    n_up = sum(1 for r in final_anomalies if r["direction"] == "positive")
+    n_down = sum(1 for r in final_anomalies if r["direction"] == "negative")
+    # Two lines: line 1 is pure-Arabic prose through one ar() call (bidi
+    # orders internal numbers/parens correctly); line 2 uses the stats-line
+    # convention — Latin label and signed delta stay OUTSIDE ar(), because
+    # bidi flips the sign and breaks paren mirroring around Latin runs.
+    summary_ar = (
+        ar(f"خلال آخر {WINDOW_HOURS} ساعات رُصد {n_alerts} شذوذ من بين {len(df)} عملة "
+           f"({n_up} صعود، {n_down} هبوط).")
+        + "\n"
+        + ar("أكبر تغيّر") + f": {biggest['label']} (Δ " + ar("نبرة")
+        + f" {biggest['tone_delta']:+.2f})"
+    )
+    ax.text(0.5, 0.80 / fig_height, summary_ar,
+            transform=ax.transAxes, ha="center", va="top",
+            fontsize=7.5, color="#6B7280")
+
     # Footer
-    footer_y = max(y - 0.05, 0.02)
+    footer_y = 0.22 / fig_height
     ax.text(0.5, footer_y,
             ar("هذا ليس نصيحة استثمارية."),
             transform=ax.transAxes, ha="center", va="top",
