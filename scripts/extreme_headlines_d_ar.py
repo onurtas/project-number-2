@@ -561,16 +561,20 @@ while len(tweet_main) > 280 and "\n" in tweet_main:
 
 # ---------- 8) REPLY TWEETS (source links as thread) ----------
 reply_tweets = []
+TCO_URL_LEN = 23  # X wraps every URL via t.co and counts it as exactly 23 chars
 
 # Reply 1: Positive article links
 if final_positive:
     reply_pos = "[+] أخبار إيجابية:\n\n"
+    reply_pos_x_len = len(reply_pos)  # X-weighted running length (URLs count as 23)
     links_added = 0
     for i, a in enumerate(final_positive, 1):
         line = f"{i}. {a['url']}\n"
-        if len(reply_pos) + len(line) > 275:
+        line_x_len = len(f"{i}. ") + TCO_URL_LEN + 1
+        if reply_pos_x_len + line_x_len > 275:
             break
         reply_pos += line
+        reply_pos_x_len += line_x_len
         links_added += 1
     if links_added > 0:  # never a reply header with zero links
         reply_tweets.append(reply_pos.strip())
@@ -578,12 +582,15 @@ if final_positive:
 # Reply 2: Negative article links
 if final_negative:
     reply_neg = "[-] أخبار سلبية:\n\n"
+    reply_neg_x_len = len(reply_neg)  # X-weighted running length (URLs count as 23)
     links_added = 0
     for i, a in enumerate(final_negative, 1):
         line = f"{i}. {a['url']}\n"
-        if len(reply_neg) + len(line) > 275:
+        line_x_len = len(f"{i}. ") + TCO_URL_LEN + 1
+        if reply_neg_x_len + line_x_len > 275:
             break
         reply_neg += line
+        reply_neg_x_len += line_x_len
         links_added += 1
     if links_added > 0:  # never a reply header with zero links
         reply_tweets.append(reply_neg.strip())
