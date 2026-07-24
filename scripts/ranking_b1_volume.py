@@ -261,14 +261,22 @@ def render_chart(lang, L, df_top_desc, df_all, window_start, window_end, tag):
     vmax = max(df_top["n_articles"])
     for bar, (_, row) in zip(bars, df_top.iterrows()):
         width = bar.get_width()
-        ax.text(width + vmax * 0.02, bar.get_y() + bar.get_height() / 2,
-                f'{int(row["n_articles"])}',
-                ha="left", va="center", fontsize=10, fontweight="bold", color="#374151")
+        # Wide bar: count outside, tone inside (rendering unchanged).
+        # Narrow bar (2026-07-24): tone moves OUTSIDE next to the count,
+        # same "n  (+t)" format as the country chart — previously narrow
+        # bars silently lost their tone badge.
         if width > vmax * 0.15:
+            ax.text(width + vmax * 0.02, bar.get_y() + bar.get_height() / 2,
+                    f'{int(row["n_articles"])}',
+                    ha="left", va="center", fontsize=10, fontweight="bold", color="#374151")
             ax.text(width - vmax * 0.02, bar.get_y() + bar.get_height() / 2,
                     f'{row["avg_tone"]:+.1f}',
                     ha="right", va="center", fontsize=8, color="white",
                     fontweight="bold", alpha=0.9)
+        else:
+            ax.text(width + vmax * 0.02, bar.get_y() + bar.get_height() / 2,
+                    f'{int(row["n_articles"])}  ({row["avg_tone"]:+.1f})',
+                    ha="left", va="center", fontsize=10, fontweight="bold", color="#374151")
 
     ax.set_yticks(list(y_pos))
     ax.set_yticklabels(df_top["label"], fontsize=11, fontweight="bold", color="#111827")
