@@ -499,7 +499,9 @@ def build_tweet_section(header, items, base_len, reserve):
     Returns "" unless at least ONE item fits under the header, so a section
     header can never be emitted without items beneath it (empty-section fix
     approved 2026-07-14; published dangling-header example 07-14 05:36 AR).
-    Budget arithmetic is unchanged from the original inline loops.
+    Reserve arguments are exact as of 2026-07-24 (see call sites): the
+    tail length, plus the negative header + first negative line when
+    guaranteeing the top negative alongside positives (budget Option B).
     """
     section = header
     added = 0
@@ -515,23 +517,42 @@ def build_tweet_section(header, items, base_len, reserve):
     return section if added > 0 else ""
 
 
+def first_item_line_len(items):
+    """Rendered length of items[0]'s line, mirroring build_tweet_section exactly."""
+    a = items[0]
+    title = (a.get("title_tr") or a["title"])
+    if len(title) > 55:
+        title = title[:52] + "..."
+    return len(f"  [{a['tone_score']:+d}] {title}\n")
+
+
 tweet_main = (
     f"أخبار العملات الرقمية ذات المشاعر المتطرفة\n"
     f"{NOW_UTC.strftime('%d.%m.%Y %H:%M')} UTC\n\n"
 )
 
-if final_positive:
-    tweet_main += build_tweet_section("[+] الأكثر إيجابية:\n", final_positive,
-                                      len(tweet_main), 80)
-
-if final_negative:
-    tweet_main += build_tweet_section("\n[-] الأكثر سلبية:\n", final_negative,
-                                      len(tweet_main), 60)
-
-tweet_main += (
+tweet_tail = (
     f"\nليس نصيحة استثمارية.\n"
     f"#كريبتو #بيتكوين"
 )
+neg_header = "\n[-] الأكثر سلبية:\n"
+
+if final_positive:
+    # Reserve the exact tail plus, when negatives exist, the negative header
+    # + its first line - guarantees the top negative always displays.
+    # Worst-case bound: base + pos header + one max line + max reserve = 270.
+    pos_reserve = len(tweet_tail) + (
+        (len(neg_header) + first_item_line_len(final_negative))
+        if final_negative else 0
+    )
+    tweet_main += build_tweet_section("[+] الأكثر إيجابية:\n", final_positive,
+                                      len(tweet_main), pos_reserve)
+
+if final_negative:
+    tweet_main += build_tweet_section(neg_header, final_negative,
+                                      len(tweet_main), len(tweet_tail))
+
+tweet_main += tweet_tail
 
 # Last-resort guard (unreachable given the reserves above): drop whole lines
 # from the end — never a mid-line cut, never "...".
