@@ -339,92 +339,97 @@ if len(final_positive) == 0 and len(final_negative) == 0:
 else:
     n_pos = len(final_positive)
     n_neg = len(final_negative)
-    n_items = n_pos + n_neg
-    fig_height = max(5, 2.0 + n_items * 1.1)
-    fig, ax = plt.subplots(figsize=(10, fig_height))
+
+    # Physical-unit layout (2026-07-25): vertical spacing defined in inches
+    # and converted to axes fractions at runtime, so thin charts (now the
+    # common case) render compact and artists can never collide at any item
+    # count. Fixes the label/badge/headline overlap on 1+1 charts
+    # (published example 25.07 05:47 AR).
+    TITLE_BAND_IN = 0.70
+    LABEL_H_IN = 0.42
+    ROW_H_IN = 0.58
+    DIVIDER_IN = 0.30
+    FOOTER_IN = 0.55
+
+    fig_height = (TITLE_BAND_IN
+                  + ((LABEL_H_IN + n_pos * ROW_H_IN) if n_pos else 0)
+                  + (DIVIDER_IN if (n_pos and n_neg) else 0)
+                  + ((LABEL_H_IN + n_neg * ROW_H_IN) if n_neg else 0)
+                  + FOOTER_IN)
+    fig = plt.figure(figsize=(10, fig_height))
+    ax = fig.add_axes([0, 0, 1, 1])
     ax.axis("off")
 
-    item_height = 0.10
+    def yf(inches_from_top):
+        """Axes-fraction y for a position measured in inches from the top."""
+        return 1.0 - inches_from_top / fig_height
 
-    # Title
-    ax.text(0.5, 0.97, "Aşırı Duygu Taşıyan Kripto Haberleri",
+    ax.text(0.5, yf(0.15), "Aşırı Duygu Taşıyan Kripto Haberleri",
             transform=ax.transAxes, ha="center", va="top",
             fontsize=18, fontweight="bold", color="#111827")
 
-    # (Timestamp subtitle removed 2026-07-18: housekeeping info, not
-    # follower-facing; the tweet text carries the date and window.)
-
-    y = 0.87
+    y_in = TITLE_BAND_IN
 
     # ---- Positive section (only if we have positives) ----
     if n_pos > 0:
-        ax.text(0.05, y, "En Pozitif Haberler",
+        ax.text(0.05, yf(y_in), "En Pozitif Haberler",
                 transform=ax.transAxes, ha="left", va="top",
                 fontsize=13, fontweight="bold", color="#16A34A")
-
-        y -= 0.05
+        y_in += LABEL_H_IN
         for a in final_positive:
             score = a.get("tone_score", 0)
-            title_display = a.get("title_tr") or a["title"]
+            title_raw = a.get("title_tr") or a["title"]
+            # Word-boundary truncation on the RAW string, before any bidi
+            # processing, so the ellipsis lands at the logical end.
+            if len(title_raw) > 85:
+                title_raw = title_raw[:85].rsplit(" ", 1)[0] + "..."
+            title_display = title_raw
 
-            ax.text(0.05, y, f"{score:+d}",
+            ax.text(0.05, yf(y_in), f"{score:+d}",
                     transform=ax.transAxes, ha="left", va="top",
                     fontsize=11, fontweight="bold", color="white",
                     bbox=dict(boxstyle="round,pad=0.3", facecolor="#22C55E", edgecolor="none"))
-
-            if len(title_display) > 85:
-                title_display = title_display[:82] + "..."
-            ax.text(0.12, y, title_display,
+            ax.text(0.12, yf(y_in), title_display,
                     transform=ax.transAxes, ha="left", va="top",
                     fontsize=10, color="#111827", fontweight="bold")
-
-            ax.text(0.12, y - 0.035, f"{a['domain']}  •  Duygu: {score:+d}/10",
+            ax.text(0.12, yf(y_in + 0.22), f"{a['domain']}  •  Duygu: {score:+d}/10",
                     transform=ax.transAxes, ha="left", va="top",
                     fontsize=8, color="#6B7280")
+            y_in += ROW_H_IN
 
-            y -= item_height
-
-        # Divider (only between sections)
-        if n_neg > 0:
-            y -= 0.01
-            ax.plot([0.05, 0.95], [y, y], color="#E5E7EB", linewidth=1,
-                    transform=ax.transAxes, clip_on=False)
-            y -= 0.03
+    # Divider (only between sections)
+    if n_pos > 0 and n_neg > 0:
+        ax.plot([0.05, 0.95], [yf(y_in + DIVIDER_IN / 2)] * 2, color="#E5E7EB",
+                linewidth=1, transform=ax.transAxes, clip_on=False)
+        y_in += DIVIDER_IN
 
     # ---- Negative section (only if we have negatives) ----
     if n_neg > 0:
-        ax.text(0.05, y, "En Negatif Haberler",
+        ax.text(0.05, yf(y_in), "En Negatif Haberler",
                 transform=ax.transAxes, ha="left", va="top",
                 fontsize=13, fontweight="bold", color="#DC2626")
-
-        y -= 0.05
+        y_in += LABEL_H_IN
         for a in final_negative:
             score = a.get("tone_score", 0)
-            title_display = a.get("title_tr") or a["title"]
+            title_raw = a.get("title_tr") or a["title"]
+            if len(title_raw) > 85:
+                title_raw = title_raw[:85].rsplit(" ", 1)[0] + "..."
+            title_display = title_raw
 
-            ax.text(0.05, y, f"{score:+d}",
+            ax.text(0.05, yf(y_in), f"{score:+d}",
                     transform=ax.transAxes, ha="left", va="top",
                     fontsize=11, fontweight="bold", color="white",
                     bbox=dict(boxstyle="round,pad=0.3", facecolor="#EF4444", edgecolor="none"))
-
-            if len(title_display) > 85:
-                title_display = title_display[:82] + "..."
-            ax.text(0.12, y, title_display,
+            ax.text(0.12, yf(y_in), title_display,
                     transform=ax.transAxes, ha="left", va="top",
                     fontsize=10, color="#111827", fontweight="bold")
-
-            ax.text(0.12, y - 0.035, f"{a['domain']}  •  Duygu: {score:+d}/10",
+            ax.text(0.12, yf(y_in + 0.22), f"{a['domain']}  •  Duygu: {score:+d}/10",
                     transform=ax.transAxes, ha="left", va="top",
                     fontsize=8, color="#6B7280")
+            y_in += ROW_H_IN
 
-            y -= item_height
-
-    # Footer positioning
-    footer_y = max(y - 0.07, 0.02)
-
-    verified_note = ""
-    ax.text(0.5, footer_y,
-            f"Yatırım tavsiyesi değildir.",
+    # Footer
+    ax.text(0.5, yf(y_in + 0.30), f"Yatırım tavsiyesi değildir.",
             transform=ax.transAxes, ha="center", va="top",
             fontsize=7, color="#9CA3AF")
 
