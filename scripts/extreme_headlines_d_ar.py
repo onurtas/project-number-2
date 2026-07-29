@@ -6,8 +6,8 @@ from arabic_text_helper import ar
 # GDELT Crypto News — Aşırı Duygu Haberleri (Type D) v3
 # Colab-ready: GDELT DOC API + Claude Sonnet verification/translation
 #
-# Two GDELT queries (bitcoin + crypto) for broader coverage
-# Deduplicates by URL, sends ~20 to Claude Sonnet
+# Two GDELT queries (bitcoin + crypto; 'cryptocurrency' fallback), 250 records each
+# Dedup by URL + exact title, hard cap 100 candidates, all sent to Claude Sonnet
 # Claude verifies, scores, translates to Turkish
 # Displays top 3 positive + top 3 negative
 # PNG (domain only), JSON (full URLs), reply tweet (links)
@@ -27,6 +27,7 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "YOUR_API_KEY_HERE")
 
 DISPLAY_PER_SIDE = 3       # aim for 3+3, flexible down to 1+1
 SEARCH_HOURS = 24           # 24h window
+MAX_CANDIDATES = 100        # hard cap after dedup, before Claude — bounds max_tokens (session 2026-07-28 §2)
 
 # ---------- 1) SETUP ----------
 
@@ -59,9 +60,11 @@ def fetch_gdelt_headlines(query, max_records=10, timespan_hours=24):
     print(f"  Fetching '{query}' (max {max_records})...")
     print(f"  URL: {url[:180]}...")
 
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"}
+
     for attempt in range(3):
         try:
-            resp = requests.get(url, timeout=30)
+            resp = requests.get(url, timeout=30, headers=headers)
             print(f"  Status: {resp.status_code}")
 
             if resp.status_code == 429:
@@ -101,13 +104,24 @@ def fetch_gdelt_headlines(query, max_records=10, timespan_hours=24):
             print(f"  Response preview: {resp.text[:300]}")
             return []
         except requests.exceptions.HTTPError as e:
+            if resp.status_code >= 500:
+                wait = 5 * (attempt + 1)
+                print(f"  ERROR: {e} — server error, retrying in {wait}s...")
+                time.sleep(wait)
+                continue
             print(f"  ERROR: {e}")
             return []
+        except requests.exceptions.RequestException as e:
+            # connection resets, timeouts, chunked-encoding failures — transient (D3)
+            wait = 5 * (attempt + 1)
+            print(f"  ERROR: {e} — transient, retrying in {wait}s...")
+            time.sleep(wait)
+            continue
         except Exception as e:
             print(f"  ERROR: {e}")
             return []
 
-    print(f"  Failed after 3 attempts (rate limiting).")
+    print(f"  Failed after 3 attempts.")
     return []
 
 
@@ -115,22 +129,22 @@ print("="*50)
 print("FETCHING HEADLINES FROM GDELT DOC API")
 print("="*50)
 
-# Call 1: Bitcoin-specific (10 articles)
+# Call 1: Bitcoin-specific (250 records)
 print("\n--- Call 1: bitcoin ---")
-batch_bitcoin = fetch_gdelt_headlines("bitcoin", max_records=15, timespan_hours=SEARCH_HOURS)
+batch_bitcoin = fetch_gdelt_headlines("bitcoin", max_records=250, timespan_hours=SEARCH_HOURS)
 
 # 3-second delay to avoid rate limiting
 time.sleep(3)
 
-# Call 2: Broader crypto (15 articles)
+# Call 2: Broader crypto (250 records)
 print("\n--- Call 2: crypto ---")
-batch_crypto = fetch_gdelt_headlines("crypto", max_records=15, timespan_hours=SEARCH_HOURS)
+batch_crypto = fetch_gdelt_headlines("crypto", max_records=250, timespan_hours=SEARCH_HOURS)
 
 # Fallback if crypto fails
 if len(batch_crypto) == 0:
     print("  'crypto' failed. Trying 'cryptocurrency' in 3s...")
     time.sleep(3)
-    batch_crypto = fetch_gdelt_headlines("cryptocurrency", max_records=15, timespan_hours=SEARCH_HOURS)
+    batch_crypto = fetch_gdelt_headlines("cryptocurrency", max_records=250, timespan_hours=SEARCH_HOURS)
 
 # Deduplicate by URL AND by title (GDELT often returns same article from different URLs)
 seen_urls = set()
@@ -148,7 +162,14 @@ for a in batch_bitcoin + batch_crypto:
     seen_titles.add(title_clean)
     all_candidates.append(a)
 
-print(f"\nTotal after dedup: {len(all_candidates)} (from {len(batch_bitcoin)} + {len(batch_crypto)})")
+fetched_total = len(batch_bitcoin) + len(batch_crypto)
+after_dedup = len(all_candidates)
+# DP-1 (session 2026-07-28): newest-first across both batches, so the cap is source-blind
+all_candidates.sort(key=lambda a: a["seendate"], reverse=True)
+if after_dedup > MAX_CANDIDATES:
+    all_candidates = all_candidates[:MAX_CANDIDATES]
+
+print(f"\nCandidates: fetched {fetched_total} ({len(batch_bitcoin)} + {len(batch_crypto)}) → after dedup {after_dedup} → after cap {len(all_candidates)} (cap {MAX_CANDIDATES})")
 print("\nHeadline preview:")
 for a in all_candidates[:10]:
     print(f"  {a['title'][:90]}")
@@ -236,9 +257,10 @@ JSON array:"""
 
     print("\nCalling Claude Sonnet for verification + translation...")
     try:
+        max_tokens_limit = 11000  # AR — sized for MAX_CANDIDATES=100, session 2026-07-28 §3.3
         response = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=3000,
+            max_tokens=max_tokens_limit,
             messages=[{"role": "user", "content": prompt}]
         )
 
@@ -276,7 +298,9 @@ JSON array:"""
         input_t = response.usage.input_tokens
         output_t = response.usage.output_tokens
         cost = (input_t * 3 / 1_000_000) + (output_t * 15 / 1_000_000)
-        print(f"  Tokens: {input_t} in, {output_t} out (~${cost:.4f})")
+        print(f"  Tokens: {input_t} in, {output_t} out (~${cost:.4f}) / max_tokens {max_tokens_limit} ({output_t / max_tokens_limit:.0%} used)")
+        if output_t >= max_tokens_limit * 0.85:
+            print(f"  ⚠️ WARNING: output at {output_t / max_tokens_limit:.0%} of max_tokens — raise the limit before it truncates")
 
         return candidates
 
