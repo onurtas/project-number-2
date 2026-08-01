@@ -146,20 +146,184 @@ if len(batch_crypto) == 0:
     time.sleep(3)
     batch_crypto = fetch_gdelt_headlines("cryptocurrency", max_records=250, timespan_hours=SEARCH_HOURS)
 
-# Deduplicate by URL AND by title (GDELT often returns same article from different URLs)
+# ---------- 2b) DEDUP NORMALIZATION + CLUSTER HELPERS ----------
+# Commit 2 (session 2026-08-01), DP-1 option C: deterministic normalization
+# only at this stage — no similarity threshold, no tuning constants. Semantic
+# same-story detection happens in the Claude pass (TASK 4) and is collapsed at
+# selection. Normalized values are COMPARISON KEYS ONLY; a["url"] and
+# a["title"] are never mutated, because they feed the PNG, the JSON payload
+# and the reply-tweet links.
+import re
+import unicodedata
+from urllib.parse import urlsplit, parse_qsl, urlencode
+
+# Fixed denylist. Every OTHER query param is preserved — some domains carry the
+# article ID in the query string, so dropping unknown params would merge
+# genuinely different articles.
+_TRACKING_PARAMS = {"fbclid", "gclid", "ref", "source", "amp", "cmpid", "smid"}
+_TRACKING_PREFIXES = ("utm_",)
+
+_ZERO_WIDTH = dict.fromkeys(
+    [0x200B, 0x200C, 0x200D, 0x200E, 0x200F, 0xFEFF, 0x00AD], None)
+_PUNCT_MAP = {}
+for _ch in "\u2018\u2019\u02bc\u2032\u00b4\u0060":
+    _PUNCT_MAP[ord(_ch)] = "'"
+for _ch in "\u201c\u201d\u2033\u00ab\u00bb":
+    _PUNCT_MAP[ord(_ch)] = '"'
+for _ch in "\u2010\u2011\u2012\u2013\u2014\u2015\u2212":
+    _PUNCT_MAP[ord(_ch)] = "-"
+
+# Domain labels that carry no brand information (TLDs, ccTLDs, generic hosts).
+_GENERIC_LABELS = {
+    "www", "com", "net", "org", "co", "io", "info", "biz", "tv", "me", "news",
+    "gov", "edu", "int", "mil", "app", "online", "site", "web", "digital",
+    "uk", "us", "de", "fr", "ch", "at", "it", "es", "nl", "se", "no", "fi",
+    "dk", "pl", "ru", "jp", "kr", "cn", "tw", "hk", "sg", "in", "au", "nz",
+    "ca", "br", "mx", "ar", "cl", "pe", "tr", "ae", "sa", "eg", "vn", "th",
+    "id", "ph", "my", "pk", "ir", "il", "za", "ng", "ke", "gr", "cz", "hu",
+    "ro", "bg", "ua", "by", "kz", "pt", "ie", "be", "lu", "sk", "si", "hr",
+    "rs", "ba", "mk", "al", "ee", "lv", "lt", "is", "mt", "cy", "eu", "asia",
+}
+
+# Separators an outlet uses to append its own name. A bare "-" is deliberately
+# absent: it would split hyphenated words and merge distinct stories.
+_TITLE_SEPARATORS = (" | ", "| ", " |", "|", " - ", " -- ", " :: ", "::",
+                     " \u2022 ", "\u2022", " / ")
+
+
+def _brand_tokens(domain):
+    """Brand tokens of a domain: 'reuters.com' -> {'reuters'}."""
+    if not domain:
+        return set()
+    host = str(domain).strip().lower()
+    labels = [p for p in host.split(".") if p]
+    return {lab for lab in labels
+            if lab not in _GENERIC_LABELS and len(lab) >= 3}
+
+
+def _split_trailing_segment(text):
+    """Split on the LAST outlet-style separator. None if there isn't one."""
+    best_i, best_sep = -1, None
+    for sep in _TITLE_SEPARATORS:
+        i = text.rfind(sep)
+        if i > 0 and i > best_i:
+            best_i, best_sep = i, sep
+    if best_sep is None:
+        return None
+    return text[:best_i], text[best_i + len(best_sep):]
+
+
+def _norm_url(url):
+    """Canonical comparison key for a URL: scheme and 'www.' dropped, fragment
+    dropped, trailing slash dropped, tracking params dropped, params sorted."""
+    if not url:
+        return ""
+    raw = str(url).strip()
+    try:
+        parts = urlsplit(raw)
+    except ValueError:
+        return raw.lower()
+    host = (parts.netloc or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    path = parts.path.rstrip("/")
+    kept = [
+        (k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
+        if k.lower() not in _TRACKING_PARAMS
+        and not k.lower().startswith(_TRACKING_PREFIXES)
+    ]
+    query = urlencode(sorted(kept))
+    return f"{host}{path}" + (f"?{query}" if query else "")
+
+
+def _norm_title(title, domain=""):
+    """Canonical comparison key for a headline. Unicode form, quote/dash
+    variants and whitespace runs normalized. A trailing segment is stripped
+    ONLY when it matches the item's own domain brand, so "X - Reuters" from
+    reuters.com collapses onto "X" while "X - what happens next" is left
+    intact. No length or position heuristic anywhere."""
+    if not title:
+        return ""
+    t = unicodedata.normalize("NFKC", str(title))
+    t = t.translate(_ZERO_WIDTH)
+    t = t.translate(_PUNCT_MAP)
+    t = re.sub(r"\s+", " ", t).strip()
+    brands = _brand_tokens(domain)
+    if brands:
+        for _ in range(2):
+            split = _split_trailing_segment(t)
+            if not split:
+                break
+            head, seg = split
+            head = head.strip()
+            compact = re.sub(r"[^a-z0-9]+", "", seg.casefold())
+            if not head or not compact:
+                break
+            variants = {compact}
+            if compact.startswith("the"):
+                variants.add(compact[3:])
+            if variants & brands:
+                t = head
+            else:
+                break
+    return re.sub(r"\s+", " ", t).strip().casefold()
+
+
+def _validate_dup_of(raw, index_1based, n_candidates):
+    """Accept a duplicate pointer only if strictly BACKWARD and in range.
+    Anything else -> None, so a malformed pointer degrades to today's
+    behaviour (a missed duplicate) and can never produce a merge (DP-2)."""
+    if raw is None or isinstance(raw, bool):
+        return None
+    try:
+        target = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if 1 <= target < index_1based <= n_candidates:
+        return target
+    return None
+
+
+def _is_english(item):
+    """0 for English-language items, 1 otherwise — DP-3 representative order.
+    Matches both "English" and "eng"; an unknown value simply sorts second."""
+    lang = str(item.get("language", "")).strip().lower()
+    return 0 if lang.startswith("eng") else 1
+
+
+# Deduplicate by URL AND title — exact keys plus deterministic normalized keys
+# (commit 2, R1-R3). The exact sets are retained for ACCOUNTING ONLY, so the
+# counters below can separate duplicates the pre-commit-2 code already caught
+# from those the normalization newly catches.
 seen_urls = set()
 seen_titles = set()
+seen_norm_urls = set()
+seen_norm_titles = set()
 all_candidates = []
+dup_exact = 0
+dup_normalized = 0
 for a in batch_bitcoin + batch_crypto:
-    title_clean = a["title"].strip().lower()
     if not a["url"] or not a["title"]:
         continue
-    if a["url"] in seen_urls:
+    url_exact = a["url"]
+    title_exact = a["title"].strip().lower()
+    url_norm = _norm_url(a["url"])
+    title_norm = _norm_title(a["title"], a.get("domain", ""))
+    is_exact_dup = (url_exact in seen_urls) or (title_exact in seen_titles)
+    is_norm_dup = ((url_norm and url_norm in seen_norm_urls)
+                   or (title_norm and title_norm in seen_norm_titles))
+    if is_exact_dup or is_norm_dup:
+        if is_exact_dup:
+            dup_exact += 1
+        else:
+            dup_normalized += 1
         continue
-    if title_clean in seen_titles:
-        continue
-    seen_urls.add(a["url"])
-    seen_titles.add(title_clean)
+    seen_urls.add(url_exact)
+    seen_titles.add(title_exact)
+    if url_norm:
+        seen_norm_urls.add(url_norm)
+    if title_norm:
+        seen_norm_titles.add(title_norm)
     all_candidates.append(a)
 
 fetched_total = len(batch_bitcoin) + len(batch_crypto)
@@ -169,7 +333,7 @@ all_candidates.sort(key=lambda a: a["seendate"], reverse=True)
 if after_dedup > MAX_CANDIDATES:
     all_candidates = all_candidates[:MAX_CANDIDATES]
 
-print(f"\nCandidates: fetched {fetched_total} ({len(batch_bitcoin)} + {len(batch_crypto)}) → after dedup {after_dedup} → after cap {len(all_candidates)} (cap {MAX_CANDIDATES})")
+print(f"\nCandidates: fetched {fetched_total} ({len(batch_bitcoin)} + {len(batch_crypto)}) → after dedup {after_dedup} (exact {dup_exact}, normalized {dup_normalized}) → after cap {len(all_candidates)} (cap {MAX_CANDIDATES})")
 print("\nHeadline preview:")
 for a in all_candidates[:10]:
     print(f"  {a['title'][:90]}")
@@ -196,6 +360,8 @@ def verify_and_translate_with_claude(candidates, api_key):
             c["reject_reason"] = None
             c["title_tr"] = c["title"]
             c["tone_score"] = 3 if i % 2 == 0 else -3
+            c["dup_of"] = None
+            c["cluster_root"] = i + 1
         return candidates
 
     client = anthropic.Anthropic(api_key=api_key)
@@ -242,6 +408,18 @@ TASK 2 — SCORE: For verified headlines, assign a sentiment score from -10 (ext
 
 TASK 3 — TRANSLATE: For verified headlines, translate the headline to Arabic. Keep crypto terms (Bitcoin, Ethereum, XRP, etc.) in original form. Make the translation natural and newspaper-quality.
 
+TASK 4 — DUPLICATE DETECTION: Some of these headlines report the SAME underlying news event, sometimes from different outlets and in different languages. For each headline, if an EARLIER headline in this list (a LOWER number) reports the same underlying event, give that earlier number. Otherwise give null.
+
+"Same underlying event" means the same specific occurrence: the same exchange closing, the same company making the same announcement, the same single market move on the same day, the same regulatory decision.
+
+NOT the same event:
+- Two headlines about the same asset or the same general topic but different occurrences
+- Two headlines about DIFFERENT assets, even when the story shape or wording is nearly identical
+- A price move and a separate analyst opinion or forecast about that asset
+- General market commentary alongside a specific event
+
+Rules: always point to the LOWEST-numbered headline of the group, and only ever to a number LOWER than the current headline's own number. Apply this to every headline, including ones you reject in TASK 1. If you are not sure two headlines report the same event, give null — a missed duplicate is acceptable, a wrong merge is not.
+
 Here are {len(candidates)} headlines:
 
 {headline_list}
@@ -252,6 +430,7 @@ Respond ONLY with a JSON array. Each element:
 - "reason": brief rejection reason (null if passed)
 - "score": sentiment score -10 to +10 (0 if rejected)
 - "title_tr": Arabic translation (null if rejected)
+- "dup_of": number of an EARLIER headline reporting the same event (null if none)
 
 JSON array:"""
 
@@ -276,6 +455,9 @@ JSON array:"""
                 candidates[idx]["reject_reason"] = v.get("reason", None)
                 candidates[idx]["tone_score"] = v.get("score", 0)
                 candidates[idx]["title_tr"] = v.get("title_tr", None)
+                # R8 (commit 2): backward-only duplicate pointer, DP-2
+                candidates[idx]["dup_of"] = _validate_dup_of(
+                    v.get("dup_of"), idx + 1, len(candidates))
 
         # Mark unmentioned as rejected
         for c in candidates:
@@ -284,6 +466,21 @@ JSON array:"""
                 c["reject_reason"] = "Not evaluated by Claude"
                 c["tone_score"] = 0
                 c["title_tr"] = None
+                c["dup_of"] = None
+
+        # R8 (commit 2): resolve dup_of chains to a cluster root (1-based).
+        # Pointers are validated strictly backward, so cycles are structurally
+        # impossible; the hop guard is defensive only.
+        for i, c in enumerate(candidates):
+            root = i + 1
+            hops = 0
+            while hops < len(candidates):
+                nxt = candidates[root - 1].get("dup_of")
+                if not nxt:
+                    break
+                root = nxt
+                hops += 1
+            c["cluster_root"] = root
 
         passed = sum(1 for c in candidates if c["verified"])
         rejected = sum(1 for c in candidates if not c["verified"])
@@ -325,6 +522,43 @@ all_candidates = verify_and_translate_with_claude(all_candidates, ANTHROPIC_API_
 
 # ---------- 4) SELECT FINAL HEADLINES ----------
 verified = [c for c in all_candidates if c.get("verified")]
+
+# R9/R10 (commit 2): collapse same-story clusters BEFORE the sign split, so one
+# event cannot occupy a slot on both sides of the chart. Representative
+# preference is DP-3: English-language member → larger |score| → newer
+# seendate. A cluster root may itself be a rejected item, so representatives
+# are always chosen among VERIFIED members only. Every merge is logged.
+_clusters = {}
+for _i, _c in enumerate(verified):
+    _key = _c.get("cluster_root") or ("_solo", _i)
+    _clusters.setdefault(_key, []).append(_c)
+
+_keep_ids = []
+_merged_dropped = 0
+for _key, _members in _clusters.items():
+    if len(_members) > 1:
+        _ordered = sorted(_members,
+                          key=lambda c: str(c.get("seendate", "")),
+                          reverse=True)
+        _ordered.sort(key=lambda c: (_is_english(c),
+                                     -abs(c.get("tone_score", 0) or 0)))
+        _kept = _ordered[0]
+        for _drop in _ordered[1:]:
+            _merged_dropped += 1
+            print(f"  ⧗ MERGED: {_drop['title'][:60]!r} "
+                  f"({_drop['domain']}) → kept "
+                  f"{_kept['title'][:60]!r} ({_kept['domain']})")
+        _keep_ids.append(id(_kept))
+    else:
+        _keep_ids.append(id(_members[0]))
+
+if _merged_dropped:
+    _keep_set = set(_keep_ids)
+    _before_merge = len(verified)
+    verified = [c for c in verified if id(c) in _keep_set]
+    print(f"⧗ Clusters: {_before_merge} verified items merged into "
+          f"{len(verified)} stories ({_merged_dropped} dropped)")
+
 verified_positive = [c for c in verified if c.get("tone_score", 0) > 0]
 verified_negative = [c for c in verified if c.get("tone_score", 0) < 0]
 
