@@ -1,21 +1,22 @@
 import os
 # ============================================================
-# GDELT Crypto News — Aşırı Duygu Haberleri (Type D) v3
-# Colab-ready: GDELT DOC API + Claude Sonnet verification/translation
+# GDELT Crypto News — Extreme Sentiment Headlines (Type D) v3
+# GitHub Actions (daily cron): GDELT DOC API + Claude Sonnet verification/translation
 #
 # Two GDELT queries (bitcoin + crypto; 'cryptocurrency' fallback), 250 records each
-# Dedup by URL + exact title, hard cap 100 candidates, all sent to Claude Sonnet
-# Claude verifies, scores, translates to Turkish
+# Dedup by URL + title, exact AND normalized keys; hard cap 100 candidates
+# Claude verifies, scores, translates to the target language, and flags
+#   same-event duplicates (TASK 4); clusters collapse at selection
 # Displays top 3 positive + top 3 negative
 # PNG (domain only), JSON (full URLs), reply tweet (links)
 #
 # API Requirements:
 #   GDELT DOC 2.0 API — free, no auth
-#   Claude Sonnet API — Anthropic API key (~$0.04/run)
+#   Claude Sonnet API — Anthropic API key (~$0.12/run at cap 100, measured 2026-08-02)
 # ============================================================
 
 # ---------- 0) SETTINGS ----------
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 # NOW_UTC = datetime(2026, 2, 20, 18, 0, tzinfo=timezone.utc)  # manual override for testing
 NOW_UTC = datetime.now(timezone.utc)  # production mode
@@ -32,16 +33,19 @@ MAX_CANDIDATES = 100        # hard cap after dedup, before Claude — bounds max
 import requests
 import json
 import time
-import numpy as np
 import matplotlib.pyplot as plt
 import pathlib
 
 # ---------- 2) FETCH FROM GDELT DOC API ----------
-def fetch_gdelt_headlines(query, max_records=10, timespan_hours=24):
+def fetch_gdelt_headlines(query, max_records=250, timespan_hours=24):
     """
     Fetch headlines from GDELT DOC 2.0 API.
     Simple query, no filters — Claude handles quality.
     """
+    # D4 (session 2026-07-28): this encoder escapes only '"' and space. That is
+    # exact for the three bare-word queries in use (bitcoin, crypto,
+    # cryptocurrency). A query containing parentheses, ':' or '&' would need a
+    # real percent-encoder here.
     query_encoded = query.replace('"', '%22').replace(" ", "%20")
 
     url = (
@@ -74,10 +78,10 @@ def fetch_gdelt_headlines(query, max_records=10, timespan_hours=24):
 
             text = resp.text.strip()
             if not text:
-                print(f"  WARNING: Empty response body.")
+                print("  WARNING: Empty response body.")
                 return []
             if text.startswith("<!") or text.startswith("<html"):
-                print(f"  WARNING: Got HTML instead of JSON.")
+                print("  WARNING: Got HTML instead of JSON.")
                 return []
 
             data = resp.json()
@@ -97,7 +101,7 @@ def fetch_gdelt_headlines(query, max_records=10, timespan_hours=24):
             return results
 
         except json.JSONDecodeError:
-            print(f"  ERROR: Response was not valid JSON.")
+            print("  ERROR: Response was not valid JSON.")
             print(f"  Response preview: {resp.text[:300]}")
             return []
         except requests.exceptions.HTTPError as e:
@@ -118,7 +122,7 @@ def fetch_gdelt_headlines(query, max_records=10, timespan_hours=24):
             print(f"  ERROR: {e}")
             return []
 
-    print(f"  Failed after 3 attempts.")
+    print("  Failed after 3 attempts.")
     return []
 
 
@@ -325,7 +329,7 @@ for a in batch_bitcoin + batch_crypto:
 
 fetched_total = len(batch_bitcoin) + len(batch_crypto)
 after_dedup = len(all_candidates)
-# DP-1 (session 2026-07-28): newest-first across both batches, so the cap is source-blind
+# DP-1 (session 2026-07-29): newest-first across both batches, so the cap is source-blind
 all_candidates.sort(key=lambda a: a["seendate"], reverse=True)
 if after_dedup > MAX_CANDIDATES:
     all_candidates = all_candidates[:MAX_CANDIDATES]
@@ -343,7 +347,8 @@ def verify_and_translate_with_claude(candidates, api_key):
     Single Claude call that:
     1. Verifies each headline is genuinely about crypto
     2. Assigns a sentiment score (-10 to +10)
-    3. Translates verified headlines to Turkish
+    3. Translates verified headlines to the target language
+    4. Flags same-event duplicates via a backward dup_of pointer
     """
     if not candidates:
         print("No candidates to verify.")
@@ -444,7 +449,8 @@ JSON array:"""
         response_text = response_text.replace("```json", "").replace("```", "").strip()
         verdicts = json.loads(response_text)
 
-        # Apply verdicts
+        # Apply verdicts. "title_tr" is a historical key name: it holds the
+        # translated headline in this script's target language.
         for v in verdicts:
             idx = v["index"] - 1
             if 0 <= idx < len(candidates):
@@ -501,17 +507,23 @@ JSON array:"""
     except json.JSONDecodeError as e:
         print(f"  ERROR parsing Claude response: {e}")
         print(f"  Raw response: {response_text[:300]}")
-        for c in candidates:
+        for i, c in enumerate(candidates):
             c["verified"] = False
+            c["reject_reason"] = "Claude response parse error"
             c["tone_score"] = 0
             c["title_tr"] = None
+            c["dup_of"] = None
+            c["cluster_root"] = i + 1
         return candidates
     except Exception as e:
         print(f"  ERROR calling Claude: {e}")
-        for c in candidates:
+        for i, c in enumerate(candidates):
             c["verified"] = False
+            c["reject_reason"] = "Claude API error"
             c["tone_score"] = 0
             c["title_tr"] = None
+            c["dup_of"] = None
+            c["cluster_root"] = i + 1
         return candidates
 
 
@@ -687,7 +699,7 @@ else:
             y_in += ROW_H_IN
 
     # Footer
-    ax.text(0.5, yf(y_in + 0.30), f"Yatırım tavsiyesi değildir.",
+    ax.text(0.5, yf(y_in + 0.30), "Yatırım tavsiyesi değildir.",
             transform=ax.transAxes, ha="center", va="top",
             fontsize=7, color="#9CA3AF")
 
@@ -790,8 +802,8 @@ tweet_main = (
 )
 
 tweet_tail = (
-    f"\nYatırım tavsiyesi değildir.\n"
-    f"#KriptoHaber #Bitcoin"
+    "\nYatırım tavsiyesi değildir.\n"
+    "#KriptoHaber #Bitcoin"
 )
 neg_header = "\n[-] En Negatif:\n"
 
