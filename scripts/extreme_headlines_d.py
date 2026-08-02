@@ -716,7 +716,13 @@ headline_data = {
     "type": "D_extreme_headlines",
     "timestamp": NOW_UTC.isoformat(),
     "search_hours": SEARCH_HOURS,
-    "candidates_fetched": len(all_candidates),
+    "fetched_total": fetched_total,
+    "fetched_bitcoin": len(batch_bitcoin),
+    "fetched_crypto": len(batch_crypto),
+    "after_dedup": after_dedup,
+    "dup_exact": dup_exact,
+    "dup_normalized": dup_normalized,
+    "candidates_after_cap": len(all_candidates),
     "candidates_verified": sum(1 for c in all_candidates if c.get("verified")),
     "candidates_rejected": sum(1 for c in all_candidates if not c.get("verified")),
     "final_positive": [
@@ -831,6 +837,7 @@ while len(tweet_main) > 280 and "\n" in tweet_main:
 
 # ---------- 8) REPLY TWEETS (source links as thread) ----------
 reply_tweets = []
+reply_x_lens = []   # X-weighted length of each reply, for logging only
 TCO_URL_LEN = 23  # X wraps every URL via t.co and counts it as exactly 23 chars
 
 # Reply 1: Positive article links
@@ -848,6 +855,7 @@ if final_positive:
         links_added += 1
     if links_added > 0:  # never a reply header with zero links
         reply_tweets.append(reply_pos.strip())
+        reply_x_lens.append(reply_pos_x_len - 1)  # -1: strip() drops the trailing newline
 
 # Reply 2: Negative article links
 if final_negative:
@@ -864,20 +872,21 @@ if final_negative:
         links_added += 1
     if links_added > 0:  # never a reply header with zero links
         reply_tweets.append(reply_neg.strip())
+        reply_x_lens.append(reply_neg_x_len - 1)  # -1: strip() drops the trailing newline
 
 # ---------- 9) PRINT RESULTS ----------
 print("\n" + "="*50)
 print("MAIN TWEET")
 print("="*50)
 print(tweet_main)
-print(f"Characters: {len(tweet_main)}")
+print(f"Characters: {len(tweet_main)} (limit 280)")
 
 for idx, rt in enumerate(reply_tweets):
     print(f"\n{'='*50}")
     print(f"REPLY TWEET {idx+1}")
     print("="*50)
     print(rt)
-    print(f"Characters: {len(rt)}")
+    print(f"Characters: {len(rt)} raw, {reply_x_lens[idx]} X-weighted (limit 280)")
 
 # Save tweet texts
 tweet_path = OUTDIR / f"extreme_headlines_{tag}_tweets.txt"
