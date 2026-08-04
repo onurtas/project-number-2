@@ -413,7 +413,7 @@ TASK 2 — SCORE: For verified headlines, assign a sentiment score from -10 (ext
 
 TASK 3 — TRANSLATE: For verified headlines, translate the headline to Arabic. Keep crypto terms (Bitcoin, Ethereum, XRP, etc.) in original form. Make the translation natural and newspaper-quality.
 
-TASK 4 — DUPLICATE DETECTION: Some of these headlines report the SAME underlying news event, sometimes from different outlets and in different languages. For each headline, if an EARLIER headline in this list (a LOWER number) reports the same underlying event, give that earlier number. Otherwise give null.
+TASK 4 — DUPLICATE DETECTION: Some of these headlines report the SAME underlying news event, sometimes from different outlets and in different languages, and often at widely separated positions in this list — an item near the end may report the same event as an item near the beginning. For each headline, if an EARLIER headline in this list (a LOWER number) reports the same underlying event, give that earlier number. Otherwise give null.
 
 "Same underlying event" means the same specific occurrence: the same exchange closing, the same company making the same announcement, the same single market move on the same day, the same regulatory decision.
 
@@ -423,7 +423,7 @@ NOT the same event:
 - A price move and a separate analyst opinion or forecast about that asset
 - General market commentary alongside a specific event
 
-Rules: always point to the LOWEST-numbered headline of the group, and only ever to a number LOWER than the current headline's own number. Apply this to every headline, including ones you reject in TASK 1. If you are not sure two headlines report the same event, give null — a missed duplicate is acceptable, a wrong merge is not.
+Rules: point to the NEAREST earlier headline of the group — the closest lower number that reports the same event, not necessarily the first one. Chains are resolved automatically: if B points to A and C points to B, all three end up grouped together, so you never need to trace a group back to its first member yourself. Only ever give a number LOWER than the current headline's own number. Apply this to every headline, including ones you reject in TASK 1. Record duplicate relationships ONLY in "dup_of" — never describe them in the "reason" field instead. If you are not sure two headlines report the same event, give null — a missed duplicate is acceptable, a wrong merge is not.
 
 Here are {len(candidates)} headlines:
 
@@ -435,7 +435,7 @@ Respond ONLY with a JSON array. Each element:
 - "reason": brief rejection reason (null if passed)
 - "score": sentiment score -10 to +10 (0 if rejected)
 - "title_tr": Arabic translation (null if rejected)
-- "dup_of": number of an EARLIER headline reporting the same event (null if none)
+- "dup_of": number of the NEAREST earlier headline reporting the same event (null if none)
 
 JSON array:"""
 
