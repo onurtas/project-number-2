@@ -72,7 +72,7 @@ def fetch_gdelt_headlines(query, max_records=250, timespan_hours=24):
             print(f"  Status: {resp.status_code}")
 
             if resp.status_code == 429:
-                wait = 5 * (attempt + 1)
+                wait = 300 * (attempt + 1)
                 print(f"  Rate limited. Waiting {wait}s before retry...")
                 time.sleep(wait)
                 continue
@@ -408,6 +408,9 @@ REJECT if:
 - Any promotional or press-release content: token presales, token launch promotions, price predictions or price targets, "could reach"/"100x"-style speculation, "nears announcing"/"set to"/"poised to" future-tense hype, sponsored-looking placements, and syndicated "crypto news today" roundups built around such items — regardless of which coin or company is being promoted. This is a STRICT rule with exactly ONE exception that may PASS:
   (1) a concrete market event that has ALREADY HAPPENED at a MAJOR crypto asset or MAJOR exchange, reported as fact (e.g., an actual completed listing, an actual product launch, an actual delisting or trading halt). The major entity may be either side of the event — a smaller token's actual completed listing ON a major exchange qualifies.
   "Major" has the same meaning as in the previous rule (top-20 assets; Binance, Coinbase or comparable top-tier exchanges). Price predictions NEVER qualify for this exception, even for major assets. This exception applies to THIS rule only — it never weakens, overrides, or extends the exceptions of any other rule above; a headline excused by this exception must still pass every other rule. If you are not sure whether a promotional headline qualifies for the exception, REJECT it — the default for promotional content is rejection.
+- Any consumer-service, general-interest or standing-page content of these kinds: consumer advice and reader-question columns (a reader's question answered, "is X worth it", "how do I", "why is X still around"), local-interest pieces whose subject is a particular shop, kiosk, branch, venue or one locality's own affairs, and recurring scheduled pages that carry a date in place of a development (daily price tables, dated market-summary pages, periodic numeric roundups). This is a STRICT rule with exactly ONE exception that may PASS:
+  (1) a headline reporting a specific market or industry development — a named company's action, a regulatory, policy or legal decision, a breach or exploit, a launch, a filing, or a specific market move with a figure — passes even when written in column, question or explainer form.
+  The first two categories are about SUBJECT SCOPE, never about an outlet's size, country or language: coverage of government policy, regulation, taxation, legislation, enforcement or market activity at NATIONAL or REGIONAL level is never local-interest content, in any country, however unfamiliar the country or outlet. Analysis, forecasts and interpretation of market moves are not covered by this rule at all, even in question form; that protection does not extend to a page whose content is a dated listing or restatement of prices. This exception applies to THIS rule only — it never weakens, overrides, or extends the exceptions of any other rule above. If you are not sure whether one of these headlines qualifies for the exception, REJECT it — the default for consumer-service and standing-page content is rejection.
 
 TASK 2 — SCORE: For verified headlines, assign a sentiment score from -10 (extremely negative for crypto) to +10 (extremely positive for crypto). Consider the crypto market impact, not general tone.
 
