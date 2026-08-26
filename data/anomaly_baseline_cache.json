@@ -1,146 +1,146 @@
 {
-  "refreshed_utc": "2026-08-25T01:22:58.123865+00:00",
-  "baseline_start": "2026-07-26T01:22:58.123865+00:00",
-  "baseline_end": "2026-08-24T19:22:58.123865+00:00",
+  "refreshed_utc": "2026-08-26T01:26:25.041966+00:00",
+  "baseline_start": "2026-07-27T01:26:25.041966+00:00",
+  "baseline_end": "2026-08-25T19:26:25.041966+00:00",
   "coins": [
     {
       "label": "Bitcoin",
       "mcap_rank": 1,
-      "n_baseline": 6626,
-      "tone_baseline": -0.8504101670448116,
-      "std_baseline": 2.4839172648990617
+      "n_baseline": 7020,
+      "tone_baseline": -0.8050759485612161,
+      "std_baseline": 2.4553394972978455
     },
     {
       "label": "Ethereum",
       "mcap_rank": 2,
-      "n_baseline": 1403,
-      "tone_baseline": -0.47102150292554773,
-      "std_baseline": 1.8813682749091307
+      "n_baseline": 1426,
+      "tone_baseline": -0.46264158660599025,
+      "std_baseline": 1.8823516727583172
     },
     {
       "label": "XRP",
       "mcap_rank": 3,
-      "n_baseline": 2081,
-      "tone_baseline": -1.464568812972863,
-      "std_baseline": 3.554663772965945
+      "n_baseline": 2119,
+      "tone_baseline": -1.419206689563151,
+      "std_baseline": 3.6032603125407774
     },
     {
       "label": "Binance",
       "mcap_rank": 4,
-      "n_baseline": 1101,
-      "tone_baseline": 0.1693312952084162,
-      "std_baseline": 2.2212622244941853
+      "n_baseline": 1102,
+      "tone_baseline": 0.14749186571173903,
+      "std_baseline": 2.2011338390682287
     },
     {
       "label": "Solana",
       "mcap_rank": 5,
-      "n_baseline": 805,
-      "tone_baseline": 0.06260937879023384,
-      "std_baseline": 2.030537307452202
+      "n_baseline": 820,
+      "tone_baseline": 0.06351280609008791,
+      "std_baseline": 2.0531574489907616
     },
     {
       "label": "Dogecoin",
       "mcap_rank": 6,
-      "n_baseline": 333,
-      "tone_baseline": -0.5512790164641328,
-      "std_baseline": 1.3169071979330471
+      "n_baseline": 336,
+      "tone_baseline": -0.5431128883584398,
+      "std_baseline": 1.3334632360348944
     },
     {
       "label": "Bitcoin Cash",
       "mcap_rank": 7,
-      "n_baseline": 58,
-      "tone_baseline": 0.5703432744853544,
-      "std_baseline": 2.100411847774178
+      "n_baseline": 59,
+      "tone_baseline": 0.5400067411021795,
+      "std_baseline": 2.095224005048708
     },
     {
       "label": "Cardano",
       "mcap_rank": 8,
-      "n_baseline": 337,
-      "tone_baseline": -0.4367674449580189,
-      "std_baseline": 1.3197119892260754
+      "n_baseline": 342,
+      "tone_baseline": -0.4267414803973562,
+      "std_baseline": 1.3199691403041895
     },
     {
       "label": "Hyperliquid",
       "mcap_rank": 9,
-      "n_baseline": 176,
-      "tone_baseline": 0.1641126929797907,
-      "std_baseline": 1.6616316875615988
+      "n_baseline": 179,
+      "tone_baseline": 0.134819519911922,
+      "std_baseline": 1.6757929666373157
     },
     {
       "label": "Monero",
       "mcap_rank": 10,
-      "n_baseline": 193,
-      "tone_baseline": -0.5290227134288852,
-      "std_baseline": 1.473022566186645
+      "n_baseline": 196,
+      "tone_baseline": -0.5245751578209499,
+      "std_baseline": 1.50807384476991
     },
     {
       "label": "Chainlink",
       "mcap_rank": 11,
-      "n_baseline": 220,
-      "tone_baseline": -0.34684154254855387,
-      "std_baseline": 1.6045782621527183
+      "n_baseline": 224,
+      "tone_baseline": -0.3491078928082773,
+      "std_baseline": 1.6052517532356159
     },
     {
       "label": "Litecoin",
       "mcap_rank": 12,
-      "n_baseline": 191,
-      "tone_baseline": -0.3662891234212241,
-      "std_baseline": 1.0636422544745836
+      "n_baseline": 192,
+      "tone_baseline": -0.38226021416110934,
+      "std_baseline": 1.072914717430537
     },
     {
       "label": "Shiba Inu",
       "mcap_rank": 13,
-      "n_baseline": 107,
-      "tone_baseline": 0.5506971372049072,
-      "std_baseline": 2.1896900542618276
+      "n_baseline": 104,
+      "tone_baseline": 0.6289623110506881,
+      "std_baseline": 2.1660584561890315
     },
     {
       "label": "Toncoin",
       "mcap_rank": 14,
       "n_baseline": 8,
-      "tone_baseline": 0.46937381312105697,
+      "tone_baseline": 0.46937381312105714,
       "std_baseline": 1.1915497862465387
     },
     {
       "label": "Polkadot",
       "mcap_rank": 15,
       "n_baseline": 26,
-      "tone_baseline": 0.7082736986404273,
-      "std_baseline": 2.423096998101768
+      "tone_baseline": 0.7082736986404272,
+      "std_baseline": 2.4230969981017676
     },
     {
       "label": "Uniswap",
       "mcap_rank": 16,
       "n_baseline": 31,
-      "tone_baseline": -0.3711914572648229,
+      "tone_baseline": -0.37119145726482283,
       "std_baseline": 2.608151047661643
     },
     {
       "label": "Aave",
       "mcap_rank": 17,
-      "n_baseline": 21,
-      "tone_baseline": -0.4454110711266742,
-      "std_baseline": 2.823112481425712
+      "n_baseline": 22,
+      "tone_baseline": -0.4251651133481889,
+      "std_baseline": 2.756711765372228
     },
     {
       "label": "Bittensor",
       "mcap_rank": 18,
       "n_baseline": 7,
-      "tone_baseline": 0.3950168456644658,
+      "tone_baseline": 0.3950168456644659,
       "std_baseline": 0.9984718988525918
     },
     {
       "label": "Zcash",
       "mcap_rank": 19,
-      "n_baseline": 47,
-      "tone_baseline": -0.0005860240171326053,
-      "std_baseline": 1.5631712567930782
+      "n_baseline": 55,
+      "tone_baseline": 0.14061385590715125,
+      "std_baseline": 1.6688744406351956
     },
     {
       "label": "VeChain",
       "mcap_rank": 20,
       "n_baseline": 9,
-      "tone_baseline": 0.8542508508955392,
+      "tone_baseline": 0.8542508508955391,
       "std_baseline": 1.5554895520069068
     },
     {
@@ -153,30 +153,30 @@
     {
       "label": "Aptos",
       "mcap_rank": 22,
-      "n_baseline": 72,
-      "tone_baseline": 0.48395051829483426,
-      "std_baseline": 2.8315231031300825
+      "n_baseline": 67,
+      "tone_baseline": 0.403154910656215,
+      "std_baseline": 2.863452762789008
     },
     {
       "label": "Arbitrum",
       "mcap_rank": 23,
-      "n_baseline": 14,
-      "tone_baseline": -0.9103263022585467,
-      "std_baseline": 2.5494861263752933
+      "n_baseline": 15,
+      "tone_baseline": -0.7633778697851182,
+      "std_baseline": 2.521806897428973
     },
     {
       "label": "Algorand",
       "mcap_rank": 24,
-      "n_baseline": 5,
-      "tone_baseline": 0.39409355930446455,
-      "std_baseline": 2.995094588257139
+      "n_baseline": 6,
+      "tone_baseline": 0.8627624444585553,
+      "std_baseline": 2.914511351419862
     },
     {
       "label": "Tezos",
       "mcap_rank": 25,
       "n_baseline": 13,
       "tone_baseline": 0.8212906856148423,
-      "std_baseline": 1.8277823302096234
+      "std_baseline": 1.8277823302096232
     },
     {
       "label": "Decentraland",
@@ -197,42 +197,42 @@
       "mcap_rank": 28,
       "n_baseline": 8,
       "tone_baseline": -1.592331224949082,
-      "std_baseline": 4.410585833834429
+      "std_baseline": 4.41058583383443
     },
     {
       "label": "Avalanche",
       "mcap_rank": 29,
-      "n_baseline": 39,
-      "tone_baseline": -0.3852371508168499,
-      "std_baseline": 0.6813234793207712
+      "n_baseline": 38,
+      "tone_baseline": -0.3864468550180913,
+      "std_baseline": 0.7012581306084523
     },
     {
       "label": "Sui",
       "mcap_rank": 30,
-      "n_baseline": 41,
-      "tone_baseline": -0.2758356664986176,
-      "std_baseline": 0.8798280979604474
+      "n_baseline": 38,
+      "tone_baseline": -0.3388093642114616,
+      "std_baseline": 0.8468674054649107
     },
     {
       "label": "Cronos",
       "mcap_rank": 31,
-      "n_baseline": 5,
-      "tone_baseline": 1.471480706527797,
-      "std_baseline": 0.7634087473512301
+      "n_baseline": 4,
+      "tone_baseline": 1.417312823000139,
+      "std_baseline": 0.8703425513386818
     },
     {
       "label": "Stellar",
       "mcap_rank": 32,
-      "n_baseline": 43,
-      "tone_baseline": -0.0713780434572928,
-      "std_baseline": 2.1428234335889926
+      "n_baseline": 42,
+      "tone_baseline": 0.0949058962829267,
+      "std_baseline": 2.3424089826098977
     },
     {
       "label": "Pepe",
       "mcap_rank": 33,
-      "n_baseline": 25,
-      "tone_baseline": 0.7722883750096179,
-      "std_baseline": 1.5955398985364027
+      "n_baseline": 26,
+      "tone_baseline": 0.7784744364325642,
+      "std_baseline": 1.5636216346555298
     },
     {
       "label": "Mantle",
@@ -259,29 +259,29 @@
       "label": "Fantom",
       "mcap_rank": 37,
       "n_baseline": 2,
-      "tone_baseline": -1.6780600761938231,
+      "tone_baseline": -1.678060076193823,
       "std_baseline": 2.025662698482444
     },
     {
       "label": "Theta",
       "mcap_rank": 38,
       "n_baseline": 3,
-      "tone_baseline": 0.032336880894618,
+      "tone_baseline": 0.032336880894617975,
       "std_baseline": 0.3613978999699041
     },
     {
       "label": "The Sandbox",
       "mcap_rank": 39,
       "n_baseline": 19,
-      "tone_baseline": 0.9729949081842008,
-      "std_baseline": 3.0383427550835616
+      "tone_baseline": 0.6849805151121059,
+      "std_baseline": 2.954216565007834
     },
     {
       "label": "Internet Computer",
       "mcap_rank": 40,
       "n_baseline": 5,
-      "tone_baseline": -1.5303930542945516,
-      "std_baseline": 2.5746911383502638
+      "tone_baseline": -1.5303930542945519,
+      "std_baseline": 2.574691138350264
     },
     {
       "label": "Floki",
@@ -328,15 +328,15 @@
     {
       "label": "Polygon",
       "mcap_rank": 48,
-      "n_baseline": 18,
-      "tone_baseline": -1.2991557830990659,
-      "std_baseline": 2.9213783887723093
+      "n_baseline": 20,
+      "tone_baseline": -1.7711409716180504,
+      "std_baseline": 2.8328795690255046
     },
     {
       "label": "Quant",
       "mcap_rank": 50,
       "n_baseline": 17,
-      "tone_baseline": -0.13435150573550353,
+      "tone_baseline": -0.13435150573550336,
       "std_baseline": 2.6170578423973443
     }
   ]
